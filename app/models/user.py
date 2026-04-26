@@ -7,9 +7,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
 class Role(str, Enum):
-    admin = "admin"
-    caixa = "caixa"
-    cozinha = "cozinha"
+    admin = "0"
+    caixa = "1"
+    cozinha = "2"
 
 role_labels = {
     Role.admin: "Administrador",

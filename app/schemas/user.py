@@ -2,14 +2,12 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
-
 class Role(str, Enum):
     admin = "admin"
     caixa = "caixa"
     cozinha = "cozinha"
 
 class UserBase(BaseModel):
-    name: str
     email: EmailStr
     role: Role = Role.caixa
 
