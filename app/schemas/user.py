@@ -3,9 +3,9 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 class Role(str, Enum):
-    admin = "admin"
-    caixa = "caixa"
-    cozinha = "cozinha"
+    admin = "0"
+    caixa = "1"
+    cozinha = "2"
 
 class UserBase(BaseModel):
     email: EmailStr

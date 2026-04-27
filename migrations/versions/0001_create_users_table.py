@@ -7,6 +7,7 @@ Create Date: 2026-04-24
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision = "0001_create_users_table"
@@ -15,17 +16,25 @@ branch_labels = None
 depends_on = None
 
 
-user_role = sa.Enum("admin", "caixa", "cozinha", name="user_role")
+user_role = postgresql.ENUM("admin", "caixa", "cozinha", name="user_role", create_type=False)
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    user_role.create(bind, checkfirst=True)
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE user_role AS ENUM ('admin', 'caixa', 'cozinha');
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END
+        $$;
+        """
+    )
 
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("name", sa.String(length=120), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password", sa.String(length=255), nullable=False),
         sa.Column("role", user_role, nullable=False),
