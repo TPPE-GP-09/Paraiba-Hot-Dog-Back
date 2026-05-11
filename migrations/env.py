@@ -13,9 +13,7 @@ if BASE_DIR not in sys.path:
 
 from app.core.database import DATABASE_URL  # noqa: E402
 from app.core.database import Base  # noqa: E402
-from app.models import permissoes  # noqa: F401,E402
-from app.models import usuario  # noqa: F401,E402
-from app.models import usuario  # noqa: F401,E402
+import app.models  # noqa: F401,E402 — importa todos os models para registrar no Base.metadata
 
 
 config = context.config
