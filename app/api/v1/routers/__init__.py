@@ -1,2 +1,2 @@
-from .users import router as users_router
-from .products import router as products_router
+from .usuarios import router as usuarios_router
+from .produtos import router as produtos_router
