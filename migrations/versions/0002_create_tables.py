@@ -104,7 +104,6 @@ def upgrade() -> None:
     op.add_column("usuarios", sa.Column("permissao_id", sa.Integer(), nullable=True))
     op.drop_column("usuarios", "password")
     op.drop_column("usuarios", "role")
-    op.rename_column("usuarios", "email", "email")
     op.add_column("usuarios", sa.Column("senha", sa.String(255), nullable=False, server_default=''))
     op.create_foreign_key("fk_usuarios_permissao_id", "usuarios", "permissoes", ["permissao_id"], ["id"])
     op.create_index(op.f("ix_usuarios_email"), "usuarios", ["email"], unique=True)
