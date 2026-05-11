@@ -47,7 +47,7 @@ def upgrade() -> None:
     op.create_table(
         "permissoes",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("nome", postgresql.ENUM('anotar_pedidos', 'cozinha', 'dashboard', 'configuracoes', name='tipo_permissao'), nullable=False, unique=True),
+        sa.Column("nome", postgresql.ENUM('anotar_pedidos', 'cozinha', 'dashboard', 'configuracoes', name='tipo_permissao', create_type=False), nullable=False, unique=True),
     )
     op.create_index(op.f("ix_permissoes_id"), "permissoes", ["id"])
 
@@ -99,7 +99,7 @@ def upgrade() -> None:
     # Update usuarios table to add permissao_id and correct schema
     op.rename_table("users", "usuarios")
     op.add_column("usuarios", sa.Column("nome", sa.String(120), nullable=False, server_default=''))
-    op.add_column("usuarios", sa.Column("funcao", postgresql.ENUM('administrador', 'caixa', 'cozinha', name='funcao_usuario'), nullable=False, server_default='caixa'))
+    op.add_column("usuarios", sa.Column("funcao", postgresql.ENUM('administrador', 'caixa', 'cozinha', name='funcao_usuario', create_type=False), nullable=False, server_default='caixa'))
     op.add_column("usuarios", sa.Column("unidade_id", sa.Integer(), nullable=True))
     op.add_column("usuarios", sa.Column("permissao_id", sa.Integer(), nullable=True))
     op.drop_column("usuarios", "password")
