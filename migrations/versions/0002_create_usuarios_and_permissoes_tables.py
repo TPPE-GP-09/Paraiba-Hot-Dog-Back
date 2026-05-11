@@ -17,7 +17,7 @@ depends_on = None
 
 
 funcao_usuario = postgresql.ENUM(
-    "adiministrador",
+    "administrador",
     "caixa",
     "cozinha",
     name="funcao_usuario",
@@ -27,7 +27,7 @@ funcao_usuario = postgresql.ENUM(
 tipo_permissao = postgresql.ENUM(
     "anotar_pedidos",
     "cozinha",
-    "dasbord",
+    "dashboard",
     "configuracoes",
     name="tipo_permissao",
     create_type=False,
@@ -39,7 +39,7 @@ def upgrade() -> None:
         """
         DO $$
         BEGIN
-            CREATE TYPE funcao_usuario AS ENUM ('adiministrador', 'caixa', 'cozinha');
+            CREATE TYPE funcao_usuario AS ENUM ('administrador', 'caixa', 'cozinha');
         EXCEPTION
             WHEN duplicate_object THEN NULL;
         END
@@ -50,7 +50,7 @@ def upgrade() -> None:
         """
         DO $$
         BEGIN
-            CREATE TYPE tipo_permissao AS ENUM ('anotar_pedidos', 'cozinha', 'dasbord', 'configuracoes');
+            CREATE TYPE tipo_permissao AS ENUM ('anotar_pedidos', 'cozinha', 'dashboard', 'configuracoes');
         EXCEPTION
             WHEN duplicate_object THEN NULL;
         END

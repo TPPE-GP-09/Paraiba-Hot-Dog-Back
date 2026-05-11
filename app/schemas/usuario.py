@@ -6,7 +6,7 @@ from app.schemas.permissoes import PermissaoRead
 
 
 class FuncaoUsuario(str, Enum):
-    adiministrador = "adiministrador"
+    administrador = "administrador"
     caixa = "caixa"
     cozinha = "cozinha"
 
