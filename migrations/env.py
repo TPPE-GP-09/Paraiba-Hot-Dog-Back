@@ -11,9 +11,9 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from app.core.database import DATABASE_URL  # noqa: E402
-from app.core.database import Base  # noqa: E402
-import app.models  # noqa: F401,E402 — importa todos os models para registrar no Base.metadata
+from src.database import DATABASE_URL  # noqa: E402
+from src.database import Base  # noqa: E402
+import src.model.model  # noqa: F401,E402 — importa todos os models para registrar no Base.metadata
 
 
 config = context.config
