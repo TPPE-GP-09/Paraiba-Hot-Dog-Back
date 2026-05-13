@@ -1,7 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from src.model.produto import Produto
+from src.produtos.model import Produto
 from src.produtos.schema import ProdutoCreate, ProdutoUpdate
 
 

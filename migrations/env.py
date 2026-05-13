@@ -13,21 +13,14 @@ if BASE_DIR not in sys.path:
 
 from src.database import DATABASE_URL  # noqa: E402
 from src.database import Base  # noqa: E402
-import src.model.endereco  # noqa: F401,E402
-import src.model.permissoes  # noqa: F401,E402
-import src.model.unidade  # noqa: F401,E402
-import src.model.usuario  # noqa: F401,E402
-import src.model.cliente  # noqa: F401,E402
-import src.model.mesa  # noqa: F401,E402
-import src.model.forma_pagamento  # noqa: F401,E402
-import src.model.categoria  # noqa: F401,E402
-import src.model.subcategoria  # noqa: F401,E402
-import src.model.produto  # noqa: F401,E402
-import src.model.produto_variacao  # noqa: F401,E402
-import src.model.pedido  # noqa: F401,E402
-import src.model.item_pedido  # noqa: F401,E402
-import src.model.adicional  # noqa: F401,E402
-import src.model.pedido_pagamento  # noqa: F401,E402
+import src.unidades.model  # noqa: F401,E402
+import src.usuarios.model  # noqa: F401,E402
+import src.clientes.model  # noqa: F401,E402
+import src.mesas.model  # noqa: F401,E402
+import src.pagamentos.model  # noqa: F401,E402
+import src.produtos.model  # noqa: F401,E402
+import src.pedidos.model  # noqa: F401,E402
+import src.cozinha.model  # noqa: F401,E402
 
 
 config = context.config
