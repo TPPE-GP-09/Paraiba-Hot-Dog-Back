@@ -2,8 +2,8 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.model.model import Usuario
-from src.usuarios.schema import UsuarioCreate, UsuarioUpdate
+from app.models.usuario import Usuario
+from app.schemas.usuario import UsuarioCreate, UsuarioUpdate
 
 
 def create_usuario(db: Session, data: UsuarioCreate) -> Usuario:
