@@ -1,0 +1,11 @@
+[MASTER]
+ignore=migrations,__pycache__
+
+[MESSAGES CONTROL]
+disable=C0111,R0903,W0212,C0103,W0611
+
+[FORMAT]
+max-line-length=120
+
+[DESIGN]
+max-args=7
