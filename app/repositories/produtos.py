@@ -1,8 +1,8 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from src.model.model import Produto
-from src.produtos.schema import ProdutoCreate, ProdutoUpdate
+from app.models.produto import Produto
+from app.schemas.produto import ProdutoCreate, ProdutoUpdate
 
 
 def listar_produtos(db: Session, skip: int, limit: int) -> list[Produto]:
