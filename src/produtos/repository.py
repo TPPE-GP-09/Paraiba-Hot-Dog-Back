@@ -1,8 +1,39 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from src.produtos.model import Produto
-from src.produtos.schema import ProdutoCreate, ProdutoUpdate
+from src.produtos.model import Categoria, Produto, Subcategoria
+from src.produtos.schema import (
+    CategoriaCreate,
+    ProdutoCreate,
+    ProdutoUpdate,
+    SubcategoriaCreate,
+)
+
+
+def listar_categorias(db: Session) -> list[Categoria]:
+    return db.query(Categoria).all()
+
+
+def criar_categoria(db: Session, data: CategoriaCreate) -> Categoria:
+    obj = Categoria(**data.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
+
+
+def listar_subcategorias(db: Session) -> list[Subcategoria]:
+    return db.query(Subcategoria).all()
+
+
+def criar_subcategoria(db: Session, data: SubcategoriaCreate) -> Subcategoria:
+    if not db.get(Categoria, data.categoria_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoria nao encontrada")
+    obj = Subcategoria(**data.model_dump())
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj
 
 
 def listar_produtos(db: Session, skip: int, limit: int) -> list[Produto]:

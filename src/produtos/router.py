@@ -3,9 +3,37 @@ from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.produtos import repository
-from src.produtos.schema import ProdutoCreate, ProdutoRead, ProdutoUpdate
+from src.produtos.schema import (
+    CategoriaCreate,
+    CategoriaRead,
+    ProdutoCreate,
+    ProdutoRead,
+    ProdutoUpdate,
+    SubcategoriaCreate,
+    SubcategoriaRead,
+)
 
 router = APIRouter()
+
+
+@router.get("/categorias", response_model=list[CategoriaRead])
+def listar_categorias(db: Session = Depends(get_db)):
+    return repository.listar_categorias(db)
+
+
+@router.post("/categorias", response_model=CategoriaRead, status_code=status.HTTP_201_CREATED)
+def criar_categoria(data: CategoriaCreate, db: Session = Depends(get_db)):
+    return repository.criar_categoria(db, data)
+
+
+@router.get("/subcategorias", response_model=list[SubcategoriaRead])
+def listar_subcategorias(db: Session = Depends(get_db)):
+    return repository.listar_subcategorias(db)
+
+
+@router.post("/subcategorias", response_model=SubcategoriaRead, status_code=status.HTTP_201_CREATED)
+def criar_subcategoria(data: SubcategoriaCreate, db: Session = Depends(get_db)):
+    return repository.criar_subcategoria(db, data)
 
 
 @router.get("/", response_model=list[ProdutoRead])
