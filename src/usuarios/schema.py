@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class TipoPermissao(str, Enum):
@@ -33,12 +33,12 @@ class UsuarioBase(BaseModel):
     nome: str
     email: EmailStr
     funcao: FuncaoUsuario = FuncaoUsuario.caixa
-    unidade_id: int | None = None
-    permissao_id: int | None = None
+    unidade_id: int | None = Field(None, gt=0)
 
 
 class UsuarioCreate(UsuarioBase):
     senha: str
+    permissao_ids: list[int] = Field(default_factory=list)
 
 
 class UsuarioUpdate(BaseModel):
@@ -46,14 +46,11 @@ class UsuarioUpdate(BaseModel):
     email: EmailStr | None = None
     senha: str | None = None
     funcao: FuncaoUsuario | None = None
-    unidade_id: int | None = None
-    permissao_id: int | None = None
+    unidade_id: int | None = Field(None, gt=0)
+    permissao_ids: list[int] | None = None
 
 
 class UsuarioRead(UsuarioBase):
     id: int
+    permissoes: list[PermissaoRead] = []
     model_config = ConfigDict(from_attributes=True)
-
-
-class UsuarioReadComPermissao(UsuarioRead):
-    permissao: PermissaoRead | None = None

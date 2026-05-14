@@ -1,28 +1,10 @@
 from enum import Enum
 
-from sqlalchemy import Enum as SQLEnum, ForeignKey, String
+from sqlalchemy import Enum as SQLEnum, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
-
-
-class TipoPermissao(str, Enum):
-    anotar_pedidos = "anotar_pedidos"
-    cozinha = "cozinha"
-    dashboard = "dashboard"
-    configuracoes = "configuracoes"
-
-
-class Permissao(Base):
-    __tablename__ = "permissoes"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    nome: Mapped[TipoPermissao] = mapped_column(
-        SQLEnum(TipoPermissao, name="tipo_permissao"),
-        nullable=False,
-        unique=True,
-    )
-    usuarios: Mapped[list[Usuario]] = relationship(back_populates="permissao")
+from src.permissoes.model import Permissao, usuario_permissoes
 
 
 class FuncaoUsuario(str, Enum):
@@ -44,6 +26,5 @@ class Usuario(Base):
         default=FuncaoUsuario.caixa,
     )
     unidade_id: Mapped[int | None] = mapped_column(nullable=True)
-    permissao_id: Mapped[int | None] = mapped_column(ForeignKey("permissoes.id"), nullable=True)
 
-    permissao: Mapped[Permissao | None] = relationship(back_populates="usuarios")
+    permissoes: Mapped[list[Permissao]] = relationship(secondary=usuario_permissoes, back_populates="usuarios")

@@ -28,6 +28,6 @@ class Unidade(Base):
     abertura: Mapped[time] = mapped_column(Time, nullable=False)
     fechamento: Mapped[time] = mapped_column(Time, nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
-    endereco_id: Mapped[int] = mapped_column(ForeignKey("enderecos.id"), nullable=False)
+    endereco_id: Mapped[int] = mapped_column(ForeignKey("enderecos.id"), nullable=True)
 
     endereco: Mapped[Endereco] = relationship("Endereco", lazy="joined")
