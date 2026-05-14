@@ -4,7 +4,7 @@ services:
       sh -c "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000"
     build:
       context: .
-      dockerfile: Docker/Dockerfile
+      dockerfile: Dockerfile
     env_file:
       - .env
     environment:
@@ -12,6 +12,8 @@ services:
       - POSTGRES_PORT=5432
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
     depends_on:
       postgres:
         condition: service_healthy
