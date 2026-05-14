@@ -13,14 +13,11 @@ if BASE_DIR not in sys.path:
 
 from src.database import DATABASE_URL  # noqa: E402
 from src.database import Base  # noqa: E402
+import src.permissoes.model  # noqa: F401,E402
 import src.unidades.model  # noqa: F401,E402
 import src.usuarios.model  # noqa: F401,E402
 import src.clientes.model  # noqa: F401,E402
-import src.mesas.model  # noqa: F401,E402
-import src.pagamentos.model  # noqa: F401,E402
 import src.produtos.model  # noqa: F401,E402
-import src.pedidos.model  # noqa: F401,E402
-import src.cozinha.model  # noqa: F401,E402
 
 
 config = context.config
