@@ -22,9 +22,9 @@ def criar_permissao(db: Session, nome: TipoPermissao) -> Permissao:
     db.add(permissao)
     try:
         db.commit()
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Permissao ja cadastrada")
+        raise HTTPException(status_code=409, detail="Permissao ja cadastrada") from exc
     db.refresh(permissao)
     return permissao
 

@@ -1,8 +1,9 @@
 [MASTER]
 ignore=migrations,__pycache__
+init-hook="import sys; sys.path.insert(0, '.')"
 
 [MESSAGES CONTROL]
-disable=C0111,R0903,W0212,C0103,W0611
+disable=C0111,R0903,W0212,C0103,W0611,R0801,E1136
 
 [FORMAT]
 max-line-length=120

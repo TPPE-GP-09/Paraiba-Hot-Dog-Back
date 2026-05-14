@@ -2,12 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-
-class TipoPermissao(str, Enum):
-    anotar_pedidos = "anotar_pedidos"
-    cozinha = "cozinha"
-    dashboard = "dashboard"
-    configuracoes = "configuracoes"
+from src.permissoes.model import TipoPermissao
 
 
 class PermissaoBase(BaseModel):

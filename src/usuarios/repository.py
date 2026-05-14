@@ -24,7 +24,7 @@ def create_usuario(db: Session, data: UsuarioCreate) -> Usuario:
     except IntegrityError as e:
         db.rollback()
         detail = "Email ja cadastrado" if "email" in str(e.orig) else "Violacao de integridade"
-        raise HTTPException(status_code=409, detail=detail)
+        raise HTTPException(status_code=409, detail=detail) from e
     db.refresh(db_usuario)
     return db_usuario
 
@@ -57,7 +57,7 @@ def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario
     except IntegrityError as e:
         db.rollback()
         detail = "Email ja cadastrado" if "email" in str(e.orig) else "Violacao de integridade"
-        raise HTTPException(status_code=409, detail=detail)
+        raise HTTPException(status_code=409, detail=detail) from e
     db.refresh(usuario)
     return usuario
 

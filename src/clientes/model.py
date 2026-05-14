@@ -10,6 +10,6 @@ class Cliente(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
     telefone: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    email: Mapped[str | None] = mapped_column(String(120), nullable=True)  
+    email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     pontos_fidelidade: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     data_cadastro: Mapped[str] = mapped_column(String(20), nullable=False)
