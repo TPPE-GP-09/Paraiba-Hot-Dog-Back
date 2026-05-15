@@ -5,15 +5,15 @@ from src.database import Base
 from src.produtos.model import Produto
 from src.usuarios.model import Usuario
 
-pedido_produtos = Table(
-    "pedido_produtos",
+pedido_cliente_produtos = Table(
+    "pedido_cliente_produtos",
     Base.metadata,
-    Column("pedido_id", ForeignKey("pedidos.id"), primary_key=True),
+    Column("pedido_id", ForeignKey("pedidos_cliente.id"), primary_key=True),
     Column("produto_id", ForeignKey("produtos.id"), primary_key=True),
 )
 
 class Pedido(Base):
-    __tablename__ = "pedidos"
+    __tablename__ = "pedidos_cliente"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     metodo_pagamento: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -23,4 +23,4 @@ class Pedido(Base):
     status: Mapped[str] = mapped_column(String(50), default="Recebido", server_default="Recebido", nullable=False)
 
     usuario: Mapped[Usuario] = relationship("Usuario")
-    produtos: Mapped[list[Produto]] = relationship("Produto", secondary=pedido_produtos)
+    produtos: Mapped[list[Produto]] = relationship("Produto", secondary=pedido_cliente_produtos)
