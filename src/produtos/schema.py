@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.produtos.model import TipoVariacao
 
-
 class CategoriaBase(BaseModel):
     nome: str = Field(..., max_length=100)
 
@@ -26,7 +25,11 @@ class CategoriaRead(CategoriaBase):
 
 class SubcategoriaBase(BaseModel):
     nome: str = Field(..., max_length=100)
-    categoria_id: int
+
+    categoria_id: int = Field(
+        ...,
+        gt=0,
+    )
 
 
 class SubcategoriaCreate(SubcategoriaBase):
@@ -34,8 +37,15 @@ class SubcategoriaCreate(SubcategoriaBase):
 
 
 class SubcategoriaUpdate(BaseModel):
-    nome: Optional[str] = Field(None, max_length=100)
-    categoria_id: Optional[int] = None
+    nome: Optional[str] = Field(
+        None,
+        max_length=100,
+    )
+
+    categoria_id: Optional[int] = Field(
+        None,
+        gt=0,
+    )
 
 
 class SubcategoriaRead(SubcategoriaBase):
@@ -49,11 +59,24 @@ class SubcategoriaReadComCategoria(SubcategoriaRead):
 
 
 class ProdutoBase(BaseModel):
-    nome: str = Field(..., max_length=255)
+    nome: str = Field(
+        ...,
+        max_length=255,
+    )
+
     descricao: Optional[str] = None
-    imagem_url: Optional[str] = Field(None, max_length=500)
+
+    imagem_url: Optional[str] = Field(
+        None,
+        max_length=500,
+    )
+
     ativo: bool = True
-    subcategoria_id: int
+
+    subcategoria_id: int = Field(
+        ...,
+        gt=0,
+    )
 
 
 class ProdutoCreate(ProdutoBase):
@@ -61,25 +84,50 @@ class ProdutoCreate(ProdutoBase):
 
 
 class ProdutoUpdate(BaseModel):
-    nome: Optional[str] = Field(None, max_length=255)
+    nome: Optional[str] = Field(
+        None,
+        max_length=255,
+    )
+
     descricao: Optional[str] = None
-    imagem_url: Optional[str] = Field(None, max_length=500)
+
+    imagem_url: Optional[str] = Field(
+        None,
+        max_length=500,
+    )
+
     ativo: Optional[bool] = None
-    subcategoria_id: Optional[int] = Field(None, gt=0)
 
-
-class ProdutoRead(ProdutoBase):
-    id: int
-
-    model_config = ConfigDict(from_attributes=True)
+    subcategoria_id: Optional[int] = Field(
+        None,
+        gt=0,
+    )
 
 
 class ProdutoVariacaoBase(BaseModel):
-    produto_id: int = Field(..., gt=0)
+    produto_id: int = Field(
+        ...,
+        gt=0,
+    )
+
     tipo: TipoVariacao
-    preco: Decimal = Field(..., gt=0, decimal_places=2)
-    preco_combo: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
-    label_combo: Optional[str] = Field(None, max_length=50)
+
+    preco: Decimal = Field(
+        ...,
+        gt=0,
+        decimal_places=2,
+    )
+
+    preco_combo: Optional[Decimal] = Field(
+        None,
+        gt=0,
+        decimal_places=2,
+    )
+
+    label_combo: Optional[str] = Field(
+        None,
+        max_length=50,
+    )
 
 
 class ProdutoVariacaoCreate(ProdutoVariacaoBase):
@@ -88,12 +136,75 @@ class ProdutoVariacaoCreate(ProdutoVariacaoBase):
 
 class ProdutoVariacaoUpdate(BaseModel):
     tipo: Optional[TipoVariacao] = None
-    preco: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
-    preco_combo: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
-    label_combo: Optional[str] = Field(None, max_length=50)
+
+    preco: Optional[Decimal] = Field(
+        None,
+        gt=0,
+        decimal_places=2,
+    )
+
+    preco_combo: Optional[Decimal] = Field(
+        None,
+        gt=0,
+        decimal_places=2,
+    )
+
+    label_combo: Optional[str] = Field(
+        None,
+        max_length=50,
+    )
 
 
 class ProdutoVariacaoRead(ProdutoVariacaoBase):
     id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ProdutoAdicionalBase(BaseModel):
+    produto_id: int = Field(
+        ...,
+        gt=0,
+    )
+
+    nome: str = Field(
+        ...,
+        max_length=255,
+    )
+
+    preco: Decimal = Field(
+        ...,
+        gt=0,
+        decimal_places=2,
+    )
+
+
+class ProdutoAdicionalCreate(ProdutoAdicionalBase):
+    pass
+
+
+class ProdutoAdicionalUpdate(BaseModel):
+    nome: Optional[str] = Field(
+        None,
+        max_length=255,
+    )
+
+    preco: Optional[Decimal] = Field(
+        None,
+        gt=0,
+        decimal_places=2,
+    )
+
+
+class ProdutoAdicionalRead(ProdutoAdicionalBase):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ProdutoRead(ProdutoBase):
+    id: int
+
+    variacoes: list[ProdutoVariacaoRead] = []
+
+    adicionais: list[ProdutoAdicionalRead] = []
 
     model_config = ConfigDict(from_attributes=True)
