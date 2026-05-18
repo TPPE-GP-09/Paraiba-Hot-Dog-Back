@@ -33,7 +33,8 @@ jobs:
             fi
             sleep 2
           done
-          echo "API did not become ready in time"
+          echo "API did not become ready in time. Imprimindo os logs do erro:"
+          docker compose logs paraiba-hotdog-back
           exit 1
 
       - name: Run pytest
