@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.permissoes.model import Permissao
+from src.unidades.model import Unidade
 from src.usuarios.model import Usuario
 from src.usuarios.schema import UsuarioCreate, UsuarioUpdate
 
@@ -14,8 +15,25 @@ def _resolver_permissoes(db: Session, ids: list[int]) -> list[Permissao]:
     return permissoes
 
 
+def _validar_unidade(db: Session, unidade_id: int | None) -> None:
+    if unidade_id is None:
+        return
+    if not db.get(Unidade, unidade_id):
+        raise HTTPException(status_code=404, detail="Unidade nao encontrada")
+
+
+def _tratar_integridade(e: IntegrityError) -> HTTPException:
+    erro = str(e.orig).lower()
+    if "email" in erro:
+        return HTTPException(status_code=409, detail="Email ja cadastrado")
+    if "fk_usuarios_unidade_id" in erro or "usuarios_unidade_id_fkey" in erro:
+        return HTTPException(status_code=404, detail="Unidade nao encontrada")
+    return HTTPException(status_code=409, detail="Violacao de integridade")
+
+
 def create_usuario(db: Session, data: UsuarioCreate) -> Usuario:
     permissoes = _resolver_permissoes(db, data.permissao_ids)
+    _validar_unidade(db, data.unidade_id)
     db_usuario = Usuario(**data.model_dump(exclude={"permissao_ids"}))
     db_usuario.permissoes = permissoes
     db.add(db_usuario)
@@ -23,8 +41,7 @@ def create_usuario(db: Session, data: UsuarioCreate) -> Usuario:
         db.commit()
     except IntegrityError as e:
         db.rollback()
-        detail = "Email ja cadastrado" if "email" in str(e.orig) else "Violacao de integridade"
-        raise HTTPException(status_code=409, detail=detail) from e
+        raise _tratar_integridade(e) from e
     db.refresh(db_usuario)
     return db_usuario
 
@@ -48,6 +65,8 @@ def get_usuario(db: Session, usuario_id: int) -> Usuario:
 def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario:
     usuario = get_usuario(db, usuario_id)
     update_data = data.model_dump(exclude_unset=True)
+    if "unidade_id" in update_data:
+        _validar_unidade(db, update_data["unidade_id"])
     if "permissao_ids" in update_data:
         usuario.permissoes = _resolver_permissoes(db, update_data.pop("permissao_ids"))
     for field, value in update_data.items():
@@ -56,8 +75,7 @@ def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario
         db.commit()
     except IntegrityError as e:
         db.rollback()
-        detail = "Email ja cadastrado" if "email" in str(e.orig) else "Violacao de integridade"
-        raise HTTPException(status_code=409, detail=detail) from e
+        raise _tratar_integridade(e) from e
     db.refresh(usuario)
     return usuario
 
