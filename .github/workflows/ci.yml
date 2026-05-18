@@ -62,4 +62,4 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: |
           pip install pytest-cov
-          pytest tests/test_cardapio.py -v --cov=src --cov-report=term-missing
+          PYTHONPATH=. pytest tests/test_cardapio.py -v --cov=src --cov-report=term-missing
