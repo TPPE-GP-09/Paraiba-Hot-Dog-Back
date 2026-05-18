@@ -36,8 +36,8 @@ def _create_unidade() -> int:
     return resp.json()["id"]
 
 
-@pytest.fixture
-def api_client() -> httpx.Client:
+@pytest.fixture(name="api_client")
+def fixture_api_client() -> httpx.Client:
     with httpx.Client(timeout=10.0) as client:
         try:
             health = client.get(f"{BASE_URL}/")
@@ -47,8 +47,8 @@ def api_client() -> httpx.Client:
         yield client
 
 
-@pytest.fixture
-def cleanup_ids():
+@pytest.fixture(name="cleanup_ids")
+def fixture_cleanup_ids():
     tracked = {"usuarios": [], "unidades": []}
     yield tracked
     with httpx.Client(timeout=10.0) as client:
