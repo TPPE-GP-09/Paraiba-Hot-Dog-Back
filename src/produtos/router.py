@@ -19,10 +19,7 @@ from src.produtos.schema import (
     ProdutoAdicionalUpdate,
 )
 
-router = APIRouter(
-    prefix="/produtos",
-    tags=["Produtos"],
-)
+router = APIRouter()
 
 @router.get(
     "/categorias",
@@ -66,66 +63,6 @@ def criar_subcategoria(
 ) -> SubcategoriaRead:
     return repository.criar_subcategoria(db, data)
 
-@router.get(
-    "/",
-    response_model=list[ProdutoRead],
-)
-def listar_produtos(
-    skip: int = 0,
-    limit: int = Query(100, le=100),
-    db: Session = Depends(get_db),
-) -> list[ProdutoRead]:
-    return repository.listar_produtos(db, skip, limit)
-
-
-@router.get(
-    "/{produto_id}",
-    response_model=ProdutoRead,
-)
-def obter_produto(
-    produto_id: int,
-    db: Session = Depends(get_db),
-) -> ProdutoRead:
-    return repository.obter_produto(db, produto_id)
-
-
-@router.post(
-    "/",
-    response_model=ProdutoRead,
-    status_code=status.HTTP_201_CREATED,
-)
-def criar_produto(
-    produto: ProdutoCreate,
-    db: Session = Depends(get_db),
-) -> ProdutoRead:
-    return repository.criar_produto(db, produto)
-
-
-@router.patch(
-    "/{produto_id}",
-    response_model=ProdutoRead,
-)
-def atualizar_produto(
-    produto_id: int,
-    data: ProdutoUpdate,
-    db: Session = Depends(get_db),
-) -> ProdutoRead:
-    return repository.atualizar_produto(
-        db,
-        produto_id,
-        data,
-    )
-
-
-@router.delete(
-    "/{produto_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-def excluir_produto(
-    produto_id: int,
-    db: Session = Depends(get_db),
-) -> None:
-    repository.excluir_produto(db, produto_id)
 
 @router.get(
     "/variacoes",
@@ -229,3 +166,65 @@ def excluir_adicional(
         db,
         adicional_id,
     )
+
+
+@router.get(
+    "/",
+    response_model=list[ProdutoRead],
+)
+def listar_produtos(
+    skip: int = 0,
+    limit: int = Query(100, le=100),
+    db: Session = Depends(get_db),
+) -> list[ProdutoRead]:
+    return repository.listar_produtos(db, skip, limit)
+
+
+@router.get(
+    "/{produto_id}",
+    response_model=ProdutoRead,
+)
+def obter_produto(
+    produto_id: int,
+    db: Session = Depends(get_db),
+) -> ProdutoRead:
+    return repository.obter_produto(db, produto_id)
+
+
+@router.post(
+    "/",
+    response_model=ProdutoRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def criar_produto(
+    produto: ProdutoCreate,
+    db: Session = Depends(get_db),
+) -> ProdutoRead:
+    return repository.criar_produto(db, produto)
+
+
+@router.patch(
+    "/{produto_id}",
+    response_model=ProdutoRead,
+)
+def atualizar_produto(
+    produto_id: int,
+    data: ProdutoUpdate,
+    db: Session = Depends(get_db),
+) -> ProdutoRead:
+    return repository.atualizar_produto(
+        db,
+        produto_id,
+        data,
+    )
+
+
+@router.delete(
+    "/{produto_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def excluir_produto(
+    produto_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    repository.excluir_produto(db, produto_id)
