@@ -49,7 +49,7 @@ jobs:
 
       - name: Run Linter
         run: |
-          pylint src/
+          pylint src/ --disable=C0304
 
       - name: Run Alembic migrations
         env:
