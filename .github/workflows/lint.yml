@@ -24,3 +24,41 @@ jobs:
       
       - name: Lint with pylint
         run: poetry run pylint src/
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install poetry
+          poetry install --with dev
+
+      - name: Start containers
+        run: docker compose up -d --build
+
+      - name: Wait for API health
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/ > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API did not become ready in time"
+          exit 1
+
+      - name: Run pytest
+        env:
+          API_BASE_URL: http://127.0.0.1:8000
+        run: poetry run pytest src/ -v
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v

@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+pytestmark = pytest.mark.integration
 
 
 def _unique_email(prefix: str) -> str:
@@ -35,6 +36,28 @@ def _create_unidade() -> int:
     return resp.json()["id"]
 
 
+@pytest.fixture
+def api_client() -> httpx.Client:
+    with httpx.Client(timeout=10.0) as client:
+        try:
+            health = client.get(f"{BASE_URL}/")
+            health.raise_for_status()
+        except httpx.HTTPError as exc:
+            pytest.skip(f"API de integracao indisponivel em {BASE_URL}: {exc}")
+        yield client
+
+
+@pytest.fixture
+def cleanup_ids():
+    tracked = {"usuarios": [], "unidades": []}
+    yield tracked
+    with httpx.Client(timeout=10.0) as client:
+        for usuario_id in reversed(tracked["usuarios"]):
+            client.delete(f"{BASE_URL}/usuarios/{usuario_id}")
+        for unidade_id in reversed(tracked["unidades"]):
+            client.delete(f"{BASE_URL}/unidades/{unidade_id}")
+
+
 @pytest.mark.parametrize(
     "nome,funcao",
     [
@@ -43,8 +66,14 @@ def _create_unidade() -> int:
         ("Usuario Admin", "administrador"),
     ],
 )
-def test_criar_usuario_com_unidade_valida(nome: str, funcao: str) -> None:
+def test_criar_usuario_com_unidade_valida(
+    nome: str,
+    funcao: str,
+    api_client: httpx.Client,
+    cleanup_ids,
+) -> None:
     unidade_id = _create_unidade()
+    cleanup_ids["unidades"].append(unidade_id)
     payload = {
         "nome": nome,
         "email": _unique_email("usuario.valido"),
@@ -54,8 +83,9 @@ def test_criar_usuario_com_unidade_valida(nome: str, funcao: str) -> None:
         "permissao_ids": [],
     }
 
-    with httpx.Client(timeout=10.0) as client:
-        response = client.post(f"{BASE_URL}/usuarios/", json=payload)
+    response = api_client.post(f"{BASE_URL}/usuarios/", json=payload)
+    if response.status_code == 201:
+        cleanup_ids["usuarios"].append(response.json()["id"])
 
     assert response.status_code == 201, response.text
     body = response.json()
@@ -66,7 +96,7 @@ def test_criar_usuario_com_unidade_valida(nome: str, funcao: str) -> None:
 
 
 @pytest.mark.parametrize("unidade_id_invalida", [999999, 123456789])
-def test_criar_usuario_com_unidade_inexistente_retorna_404(unidade_id_invalida: int) -> None:
+def test_criar_usuario_com_unidade_inexistente_retorna_404(unidade_id_invalida: int, api_client: httpx.Client) -> None:
     payload = {
         "nome": "Usuario Unidade Invalida",
         "email": _unique_email("usuario.invalido"),
@@ -76,15 +106,18 @@ def test_criar_usuario_com_unidade_inexistente_retorna_404(unidade_id_invalida: 
         "permissao_ids": [],
     }
 
-    with httpx.Client(timeout=10.0) as client:
-        response = client.post(f"{BASE_URL}/usuarios/", json=payload)
+    response = api_client.post(f"{BASE_URL}/usuarios/", json=payload)
 
     assert response.status_code == 404, response.text
     assert response.json()["detail"] == "Unidade nao encontrada"
 
 
-def test_atualizar_usuario_com_unidade_inexistente_retorna_404() -> None:
+def test_atualizar_usuario_com_unidade_inexistente_retorna_404(
+    api_client: httpx.Client,
+    cleanup_ids,
+) -> None:
     unidade_id = _create_unidade()
+    cleanup_ids["unidades"].append(unidade_id)
     create_payload = {
         "nome": "Usuario Atualizacao",
         "email": _unique_email("usuario.update"),
@@ -94,30 +127,29 @@ def test_atualizar_usuario_com_unidade_inexistente_retorna_404() -> None:
         "permissao_ids": [],
     }
 
-    with httpx.Client(timeout=10.0) as client:
-        create_resp = client.post(f"{BASE_URL}/usuarios/", json=create_payload)
-        assert create_resp.status_code == 201, create_resp.text
-        usuario_id = create_resp.json()["id"]
-
-        patch_resp = client.patch(
-            f"{BASE_URL}/usuarios/{usuario_id}",
-            json={"unidade_id": 999999},
-        )
+    create_resp = api_client.post(f"{BASE_URL}/usuarios/", json=create_payload)
+    assert create_resp.status_code == 201, create_resp.text
+    usuario_id = create_resp.json()["id"]
+    cleanup_ids["usuarios"].append(usuario_id)
+    patch_resp = api_client.patch(
+        f"{BASE_URL}/usuarios/{usuario_id}",
+        json={"unidade_id": 999999},
+    )
 
     assert patch_resp.status_code == 404, patch_resp.text
     assert patch_resp.json()["detail"] == "Unidade nao encontrada"
 
 
-def test_listar_usuarios_retorna_200() -> None:
-    with httpx.Client(timeout=10.0) as client:
-        response = client.get(f"{BASE_URL}/usuarios/")
+def test_listar_usuarios_retorna_200(api_client: httpx.Client) -> None:
+    response = api_client.get(f"{BASE_URL}/usuarios/")
 
     assert response.status_code == 200, response.text
     assert isinstance(response.json(), list)
 
 
-def test_obter_usuario_existente_retorna_200() -> None:
+def test_obter_usuario_existente_retorna_200(api_client: httpx.Client, cleanup_ids) -> None:
     unidade_id = _create_unidade()
+    cleanup_ids["unidades"].append(unidade_id)
     payload = {
         "nome": "Usuario Get",
         "email": _unique_email("usuario.get"),
@@ -127,12 +159,11 @@ def test_obter_usuario_existente_retorna_200() -> None:
         "permissao_ids": [],
     }
 
-    with httpx.Client(timeout=10.0) as client:
-        create_resp = client.post(f"{BASE_URL}/usuarios/", json=payload)
-        assert create_resp.status_code == 201, create_resp.text
-        usuario_id = create_resp.json()["id"]
-
-        get_resp = client.get(f"{BASE_URL}/usuarios/{usuario_id}")
+    create_resp = api_client.post(f"{BASE_URL}/usuarios/", json=payload)
+    assert create_resp.status_code == 201, create_resp.text
+    usuario_id = create_resp.json()["id"]
+    cleanup_ids["usuarios"].append(usuario_id)
+    get_resp = api_client.get(f"{BASE_URL}/usuarios/{usuario_id}")
 
     assert get_resp.status_code == 200, get_resp.text
     body = get_resp.json()
@@ -140,16 +171,16 @@ def test_obter_usuario_existente_retorna_200() -> None:
     assert body["email"] == payload["email"]
 
 
-def test_obter_usuario_inexistente_retorna_404() -> None:
-    with httpx.Client(timeout=10.0) as client:
-        response = client.get(f"{BASE_URL}/usuarios/999999999")
+def test_obter_usuario_inexistente_retorna_404(api_client: httpx.Client) -> None:
+    response = api_client.get(f"{BASE_URL}/usuarios/999999999")
 
     assert response.status_code == 404, response.text
     assert response.json()["detail"] == "Usuario nao encontrado"
 
 
-def test_deletar_usuario_remove_e_get_retorna_404() -> None:
+def test_deletar_usuario_remove_e_get_retorna_404(api_client: httpx.Client, cleanup_ids) -> None:
     unidade_id = _create_unidade()
+    cleanup_ids["unidades"].append(unidade_id)
     payload = {
         "nome": "Usuario Delete",
         "email": _unique_email("usuario.delete"),
@@ -159,15 +190,12 @@ def test_deletar_usuario_remove_e_get_retorna_404() -> None:
         "permissao_ids": [],
     }
 
-    with httpx.Client(timeout=10.0) as client:
-        create_resp = client.post(f"{BASE_URL}/usuarios/", json=payload)
-        assert create_resp.status_code == 201, create_resp.text
-        usuario_id = create_resp.json()["id"]
-
-        delete_resp = client.delete(f"{BASE_URL}/usuarios/{usuario_id}")
-        assert delete_resp.status_code == 204, delete_resp.text
-
-        get_resp = client.get(f"{BASE_URL}/usuarios/{usuario_id}")
+    create_resp = api_client.post(f"{BASE_URL}/usuarios/", json=payload)
+    assert create_resp.status_code == 201, create_resp.text
+    usuario_id = create_resp.json()["id"]
+    delete_resp = api_client.delete(f"{BASE_URL}/usuarios/{usuario_id}")
+    assert delete_resp.status_code == 204, delete_resp.text
+    get_resp = api_client.get(f"{BASE_URL}/usuarios/{usuario_id}")
 
     assert get_resp.status_code == 404, get_resp.text
     assert get_resp.json()["detail"] == "Usuario nao encontrado"

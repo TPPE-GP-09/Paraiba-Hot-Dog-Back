@@ -18,6 +18,20 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.execute(
+        sa.text(
+            """
+            UPDATE usuarios
+            SET unidade_id = NULL
+            WHERE unidade_id IS NOT NULL
+              AND NOT EXISTS (
+                SELECT 1
+                FROM unidades
+                WHERE unidades.id = usuarios.unidade_id
+              )
+            """
+        )
+    )
     op.create_foreign_key(
         "fk_usuarios_unidade_id",
         "usuarios",
@@ -29,4 +43,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_constraint("fk_usuarios_unidade_id", "usuarios", type_="foreignkey")
-
