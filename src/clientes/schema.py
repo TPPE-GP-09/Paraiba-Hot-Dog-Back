@@ -37,3 +37,11 @@ class ClienteRead(ClienteBase):
     data_cadastro: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ClienteFiltro(ClienteTelefoneMixin):
+    telefone: Optional[str] = None
+    nome: Optional[str] = None
+    email: Optional[EmailStr] = None
+    skip: int = Field(default=0, ge=0)
+    limit: int = Field(default=100, gt=0)

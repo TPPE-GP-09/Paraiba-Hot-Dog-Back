@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.clientes import repository
 from src.clientes.repository import _mapear_erro_integridade
-from src.clientes.schema import ClienteCreate, ClienteRead, ClienteUpdate
+from src.clientes.schema import ClienteCreate, ClienteFiltro, ClienteRead, ClienteUpdate
 from src.database import get_db
 
 router = APIRouter()
@@ -23,15 +23,10 @@ def criar_cliente(data: ClienteCreate, db: Session = Depends(get_db)) -> Cliente
 
 @router.get("/", response_model=list[ClienteRead])
 def listar_clientes(
-    telefone: str | None = Query(default=None),
-    nome: str | None = Query(default=None),
-    email: str | None = Query(default=None),
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=100, gt=0),
+    filtro: ClienteFiltro = Depends(),
     db: Session = Depends(get_db),
 ) -> list[ClienteRead]:
-    clientes = repository.listar_clientes(
-        db, telefone, nome, email, skip, limit)
+    clientes = repository.listar_clientes(db, filtro)
     return [ClienteRead.model_validate(c) for c in clientes]
 
 

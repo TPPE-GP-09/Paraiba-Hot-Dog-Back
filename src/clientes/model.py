@@ -19,4 +19,5 @@ class Cliente(Base):
         Integer, default=0, nullable=False)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     data_cadastro: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False)
+        DateTime, server_default=func.now(), nullable=False  # pylint: disable=not-callable
+    )
