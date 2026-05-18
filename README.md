@@ -63,13 +63,10 @@ O Docker Compose sobe o backend e o PostgreSQL automaticamente, aplicando as mig
 git clone https://github.com/TPPE-GP-09/Paraiba-Hot-Dog-Back.git
 cd Paraiba-Hot-Dog-Back
 
-# 2. Criar o arquivo de variáveis de ambiente
-cp .env.example .env  # edite conforme necessário
-
-# 3. Subir os serviços
+# 2. Subir os serviços
 docker-compose up -d
 
-# 4. Acompanhar os logs
+# 3. Acompanhar os logs
 docker-compose logs -f
 ```
 
