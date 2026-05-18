@@ -18,6 +18,7 @@ import src.unidades.model  # noqa: F401,E402
 import src.usuarios.model  # noqa: F401,E402
 import src.clientes.model  # noqa: F401,E402
 import src.produtos.model  # noqa: F401,E402
+import src.blog.model  # noqa: F401,E402
 
 
 config = context.config
