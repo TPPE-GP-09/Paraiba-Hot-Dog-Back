@@ -53,13 +53,13 @@ jobs:
 
       - name: Run Alembic migrations
         env:
-          TEST_TEST_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paraiba_hotdog_db
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paraiba_hotdog_db
         run: |
           alembic upgrade head
 
       - name: Run Tests with Coverage
         env:
-          TEST_TEST_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paraiba_hotdog_db
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paraiba_hotdog_db
         run: |
           pip install pytest-cov
           PYTHONPATH=. pytest tests/test_cardapio.py -v --cov=src --cov-report=term-missing
