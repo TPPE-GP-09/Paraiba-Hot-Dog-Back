@@ -1,6 +1,6 @@
 from enum import Enum
 
-from sqlalchemy import Enum as SQLEnum, String
+from sqlalchemy import Enum as SQLEnum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
@@ -25,6 +25,6 @@ class Usuario(Base):
         nullable=False,
         default=FuncaoUsuario.caixa,
     )
-    unidade_id: Mapped[int | None] = mapped_column(nullable=True)
+    unidade_id: Mapped[int | None] = mapped_column(ForeignKey("unidades.id"), nullable=True)
 
     permissoes: Mapped[list[Permissao]] = relationship(secondary=usuario_permissoes, back_populates="usuarios")
