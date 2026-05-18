@@ -22,7 +22,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_DB: paraiba_hotdog_db
         ports:
           - 5432:5432
         options: >-
@@ -53,13 +53,13 @@ jobs:
 
       - name: Run Alembic migrations
         env:
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          TEST_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paraiba_hotdog_db
         run: |
           alembic upgrade head
 
       - name: Run Tests with Coverage
         env:
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          TEST_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/paraiba_hotdog_db
         run: |
           pip install pytest-cov
           PYTHONPATH=. pytest tests/test_cardapio.py -v --cov=src --cov-report=term-missing
