@@ -1,5 +1,8 @@
 """Tests for blog endpoints."""
 
+# Pylint doesn't understand pytest fixtures in this module.
+# pylint: disable=redefined-outer-name,unused-argument
+
 from datetime import date
 import pytest
 from fastapi.testclient import TestClient
