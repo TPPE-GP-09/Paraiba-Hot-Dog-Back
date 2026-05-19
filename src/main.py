@@ -11,7 +11,7 @@ app = FastAPI(title="Paraiba Hot Dog API")
 
 app.include_router(clientes_router, prefix="/clientes", tags=["clientes"])
 app.include_router(usuarios_router, prefix="/usuarios", tags=["usuarios"])
-app.include_router(produtos_router, prefix="/produtos", tags=["produtos"])
+app.include_router(produtos_router, prefix="/produtos", tags=["Produtos"])
 app.include_router(unidades_router, prefix="/unidades", tags=["unidades"])
 app.include_router(permissoes_router, prefix="/permissoes",
                    tags=["permissoes"])
