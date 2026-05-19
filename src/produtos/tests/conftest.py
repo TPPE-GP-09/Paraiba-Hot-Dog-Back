@@ -43,3 +43,32 @@ def cliente(sessao_banco):
     with TestClient(app) as cliente_teste:
         yield cliente_teste
     app.dependency_overrides.clear()
+
+@pytest.fixture
+def dados_base(cliente):
+    resposta_categoria = cliente.post("/produtos/categorias", json={"nome": "Categoria Teste"})
+    assert resposta_categoria.status_code == 201
+    categoria = resposta_categoria.json()
+
+    resposta_subcategoria = cliente.post("/produtos/subcategorias", json={
+        "nome": "Subcategoria Teste", 
+        "categoria_id": categoria["id"]
+    })
+    assert resposta_subcategoria.status_code == 201
+    subcategoria = resposta_subcategoria.json()
+
+    resposta_produto = cliente.post("/produtos/", json={
+        "nome": "Produto Teste",
+        "descricao": "Descricao",
+        "imagem_url": "http://img.com/img.png",
+        "ativo": True,
+        "subcategoria_id": subcategoria["id"]
+    })
+    assert resposta_produto.status_code == 201
+    produto = resposta_produto.json()
+
+    return {
+        "categoria": categoria,
+        "subcategoria": subcategoria,
+        "produto": produto
+    }
