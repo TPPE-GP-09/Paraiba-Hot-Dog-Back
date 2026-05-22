@@ -16,11 +16,17 @@ def _formatar_telefone_whatsapp(telefone: str) -> str:
 
 
 def _credenciais_configuradas() -> bool:
-    if not settings.whatsapp_token or not settings.phone_number_id:
+    if not settings.twilio_account_sid or not settings.twilio_api_key_sid or not settings.twilio_auth_token:
         return False
-    if settings.whatsapp_token == "SEU_ACCESS_TOKEN_AQUI":
+    if settings.twilio_account_sid == "SEU_TWILIO_ACCOUNT_SID_AQUI":
         return False
-    if settings.phone_number_id == "SEU_PHONE_NUMBER_ID_AQUI":
+    if settings.twilio_api_key_sid == "SEU_TWILIO_API_KEY_SID_AQUI":
+        return False
+    if settings.twilio_auth_token == "SEU_TWILIO_AUTH_TOKEN_AQUI":
+        return False
+    if not settings.twilio_api_key_sid.startswith("SK"):
+        return False
+    if not settings.twilio_whatsapp_from.startswith("whatsapp:"):
         return False
     return True
 
@@ -40,38 +46,42 @@ def enviar_boas_vindas(nome: str, telefone: str) -> dict:
         return {"status": "skipped", "reason": "missing_whatsapp_credentials"}
 
     telefone_formatado = _formatar_telefone_whatsapp(telefone)
-    api_url = f"https://graph.facebook.com/v19.0/{settings.phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {settings.whatsapp_token}",
-        "Content-Type": "application/json",
-    }
+    destino = f"whatsapp:+{telefone_formatado}"
+    api_url = (
+        f"https://api.twilio.com/2010-04-01/Accounts/"
+        f"{settings.twilio_account_sid}/Messages.json"
+    )
     payload = {
-        "messaging_product": "whatsapp",
-        "to": telefone_formatado,
-        "type": "text",
-        "text": {
-            "body": (
-                f"Ola, {nome}!\n\n"
-                "Seja bem-vindo ao nosso programa de fidelidade!\n\n"
-                "A partir de agora voce acumula pontos a cada compra e pode trocar por recompensas incriveis.\n\n"
-                "Qualquer duvida, e so nos chamar aqui."
-            )
-        },
+        "From": settings.twilio_whatsapp_from,
+        "To": destino,
+        "Body": (
+            f"Ola, {nome}!\n\n"
+            "Seja bem-vindo ao nosso programa de fidelidade!\n\n"
+            "A partir de agora, voce acumula pontos a cada compra e pode trocar por hot dogs.\n\n"
+            "Para conferir seus pontos, acesse o nosso site.\n\n"
+            "Obrigado pela parceria e fidelidade.\n\n"
+            "PARAIBA HOTDOG"
+        ),
     }
 
     try:
-        response = requests.post(api_url, headers=headers, json=payload, timeout=10)
-        if response.status_code == 200:
+        response = requests.post(
+            api_url,
+            data=payload,
+            auth=(settings.twilio_api_key_sid, settings.twilio_auth_token),
+            timeout=10,
+        )
+        if response.status_code in (200, 201):
             logger.info(
                 "Mensagem de boas-vindas enviada com sucesso para cliente=%s telefone=%s",
                 nome,
-                telefone_formatado,
+                destino,
             )
         else:
             logger.error(
                 "Falha ao enviar WhatsApp para cliente=%s telefone=%s status=%s body=%s",
                 nome,
-                telefone_formatado,
+                destino,
                 response.status_code,
                 response.text,
             )

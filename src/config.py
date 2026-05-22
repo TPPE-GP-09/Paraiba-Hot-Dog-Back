@@ -8,8 +8,10 @@ class Settings(BaseSettings):
     postgres_port: str = "5432"
     postgres_db: str = "paraiba_hotdog_db"
     database_url: str | None = None
-    whatsapp_token: str = ""
-    phone_number_id: str = ""
+    twilio_account_sid: str = ""
+    twilio_api_key_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_from: str = "whatsapp:+14155238886"
     model_config = SettingsConfigDict(env_file=".env")
 
 
