@@ -5,12 +5,19 @@ import httpx
 import pytest
 
 BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN")
 pytestmark = pytest.mark.integration
 
 
 def _unique_email(prefix: str) -> str:
     stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
     return f"{prefix}.{stamp}@example.com"
+
+
+def _auth_headers() -> dict[str, str]:
+    if not API_AUTH_TOKEN:
+        pytest.skip("Defina API_AUTH_TOKEN para rodar os testes de integracao.")
+    return {"Authorization": f"Bearer {API_AUTH_TOKEN}"}
 
 
 def _create_unidade() -> int:
@@ -30,7 +37,7 @@ def _create_unidade() -> int:
             "estado": "PB",
         },
     }
-    with httpx.Client(timeout=10.0) as client:
+    with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         resp = client.post(f"{BASE_URL}/unidades/", json=payload)
     assert resp.status_code == 201, resp.text
     return resp.json()["id"]
@@ -38,7 +45,7 @@ def _create_unidade() -> int:
 
 @pytest.fixture(name="api_client")
 def fixture_api_client() -> httpx.Client:
-    with httpx.Client(timeout=10.0) as client:
+    with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         try:
             health = client.get(f"{BASE_URL}/")
             health.raise_for_status()
@@ -51,7 +58,9 @@ def fixture_api_client() -> httpx.Client:
 def fixture_cleanup_ids():
     tracked = {"usuarios": [], "unidades": []}
     yield tracked
-    with httpx.Client(timeout=10.0) as client:
+    if not API_AUTH_TOKEN:
+        return
+    with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         for usuario_id in reversed(tracked["usuarios"]):
             client.delete(f"{BASE_URL}/usuarios/{usuario_id}")
         for unidade_id in reversed(tracked["unidades"]):
