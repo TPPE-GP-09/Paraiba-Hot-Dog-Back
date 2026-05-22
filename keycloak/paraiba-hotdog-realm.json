@@ -1,0 +1,61 @@
+{
+  "realm": "paraiba-hotdog",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "administrador",
+        "description": "Administrador da API"
+      },
+      {
+        "name": "caixa",
+        "description": "Usuario do caixa"
+      },
+      {
+        "name": "cozinha",
+        "description": "Usuario da cozinha"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "paraiba-hotdog-api",
+      "name": "paraiba-hotdog-api",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "integration-test",
+      "email": "integration-test@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": [
+        "administrador"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "integration-test",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 POETRY := poetry
 
-.PHONY: help install shell run test pytest tox docker-build docker-up docker-down logs migrate alembic-revision
+.PHONY: help install shell run test pytest integration-test keycloak-up keycloak-token tox docker-build docker-up docker-down logs migrate alembic-revision
 
 help:
 	@echo "Available targets:"
@@ -10,6 +10,9 @@ help:
 	@echo "  run            : Run dev server (uvicorn)"
 	@echo "  test           : Run pytest"
 	@echo "  pytest         : Run pytest with optional TEST variable: make pytest TEST=src/unidades/test_unidades.py"
+	@echo "  integration-test : Start Keycloak, generate token, and run integration tests"
+	@echo "  keycloak-up    : Start Keycloak with imported test realm"
+	@echo "  keycloak-token : Print an access token for the integration test user"
 	@echo "  tox            : Run tox"
 	@echo "  docker-build   : Build docker image"
 	@echo "  docker-up      : Start services with docker-compose"
@@ -34,6 +37,15 @@ test:
 
 pytest:
 	$(POETRY) run pytest $(TEST)
+
+integration-test:
+	scripts/run-integration-tests.sh
+
+keycloak-up:
+	docker compose up -d keycloak
+
+keycloak-token:
+	scripts/keycloak-token.sh
 
 lint:
 	$(POETRY) run pylint src
