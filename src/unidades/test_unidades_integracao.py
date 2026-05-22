@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN")
 
 pytestmark = pytest.mark.integration
 
@@ -35,9 +36,15 @@ def _payload_unidade(**overrides):
     return payload
 
 
+def _auth_headers() -> dict[str, str]:
+    if not API_AUTH_TOKEN:
+        pytest.skip("Defina API_AUTH_TOKEN para rodar os testes de integracao.")
+    return {"Authorization": f"Bearer {API_AUTH_TOKEN}"}
+
+
 @pytest.fixture(name="api_client")
 def fixture_api_client() -> httpx.Client:
-    with httpx.Client(timeout=10.0) as client:
+    with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         try:
             health = client.get(f"{BASE_URL}/")
             health.raise_for_status()
@@ -50,7 +57,9 @@ def fixture_api_client() -> httpx.Client:
 def fixture_cleanup_ids():
     tracked = []
     yield tracked
-    with httpx.Client(timeout=10.0) as client:
+    if not API_AUTH_TOKEN:
+        return
+    with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         for unidade_id in reversed(tracked):
             client.delete(f"{BASE_URL}/unidades/{unidade_id}")
 

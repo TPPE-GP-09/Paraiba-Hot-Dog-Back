@@ -8,7 +8,7 @@ from src.clientes import repository
 from src.clientes.repository import _mapear_erro_integridade
 from src.clientes.schema import ClienteCreate, ClienteFiltro, ClienteRead, ClienteUpdate
 from src.database import get_db
-from src.whatsapp_boas_vindas import enviar_boas_vindas
+from src.whatsapp.whatsapp_boas_vindas import enviar_boas_vindas
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
