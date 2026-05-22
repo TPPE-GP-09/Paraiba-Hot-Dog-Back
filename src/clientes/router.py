@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -6,18 +8,29 @@ from src.clientes import repository
 from src.clientes.repository import _mapear_erro_integridade
 from src.clientes.schema import ClienteCreate, ClienteFiltro, ClienteRead, ClienteUpdate
 from src.database import get_db
+from src.whatsapp.whatsapp_boas_vindas import enviar_boas_vindas
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/", response_model=ClienteRead, status_code=status.HTTP_201_CREATED)
-def criar_cliente(data: ClienteCreate, db: Session = Depends(get_db)) -> ClienteRead:
+def criar_cliente(
+    data: ClienteCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> ClienteRead:
     try:
         cliente = repository.criar_cliente(db, data)
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(
             status_code=409, detail=_mapear_erro_integridade(e)) from e
+    background_tasks.add_task(enviar_boas_vindas, cliente.nome, cliente.telefone)
+    logger.info(
+        "Cliente cadastrado com sucesso (id=%s). Envio de WhatsApp agendado.",
+        cliente.id,
+    )
     return ClienteRead.model_validate(cliente)
 
 
