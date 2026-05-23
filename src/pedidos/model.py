@@ -49,12 +49,14 @@ class Pedido(Base):
         nullable=False,
     )
     subtotal: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0, nullable=False)
+    desconto_fidelidade: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0, nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0, nullable=False)
     forma_pagamento: Mapped[FormaPagamento | None] = mapped_column(
         SQLEnum(FormaPagamento, name="forma_pagamento"),
         nullable=True,
     )
     observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pontos_fidelidade_utilizados: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     pontos_fidelidade_creditados: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

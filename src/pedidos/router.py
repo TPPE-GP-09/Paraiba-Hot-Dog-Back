@@ -6,7 +6,6 @@ from src.pedidos import repository
 from src.pedidos.schema import (
     AdicionarItensPedido,
     AtualizarStatusCozinha,
-    AtualizarStatusItem,
     CancelarItemPedido,
     CancelarPedido,
     CozinhaItemRead,
@@ -61,15 +60,6 @@ def adicionar_itens(
     db: Session = Depends(get_db),
 ) -> PedidoRead:
     return repository.adicionar_itens(db, pedido_id, data)
-
-
-@router.patch("/itens/{item_id}/status", response_model=ItemPedidoRead)
-def atualizar_status_item(
-    item_id: int,
-    data: AtualizarStatusItem,
-    db: Session = Depends(get_db),
-) -> ItemPedidoRead:
-    return repository.atualizar_status_item(db, item_id, data.status)
 
 
 @router.post("/itens/{item_id}/cancelar", response_model=PedidoRead)

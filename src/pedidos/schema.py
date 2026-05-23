@@ -48,6 +48,7 @@ class PedidoCreate(BaseModel):
     nome_comanda: str = Field(..., min_length=1, max_length=120)
     cliente_id: Optional[int] = Field(None, gt=0)
     observacao: Optional[str] = None
+    usar_desconto_fidelidade: bool = False
     itens: list[ItemPedidoCreate] = []
 
 
@@ -58,9 +59,11 @@ class PedidoRead(BaseModel):
     cliente_id: Optional[int] = None
     status: StatusPedido
     subtotal: Decimal
+    desconto_fidelidade: Decimal
     total: Decimal
     forma_pagamento: Optional[FormaPagamento] = None
     observacao: Optional[str] = None
+    pontos_fidelidade_utilizados: int
     pontos_fidelidade_creditados: bool
     created_at: datetime
     fechado_em: Optional[datetime] = None
@@ -78,10 +81,6 @@ class PedidoFiltro(BaseModel):
 
 class AdicionarItensPedido(BaseModel):
     itens: list[ItemPedidoCreate] = Field(..., min_length=1)
-
-
-class AtualizarStatusItem(BaseModel):
-    status: StatusItemPedido
 
 
 class CancelarItemPedido(BaseModel):
@@ -120,7 +119,4 @@ class CozinhaItemRead(BaseModel):
 class AtualizarStatusCozinha(BaseModel):
     pedido_id: int = Field(..., gt=0)
     lote: int = Field(..., gt=0)
-    produto_variacao_id: int = Field(..., gt=0)
-    observacao: Optional[str] = None
-    adicional_ids: list[int] = []
     status: StatusItemPedido

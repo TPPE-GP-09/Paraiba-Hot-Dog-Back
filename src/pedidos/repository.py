@@ -29,6 +29,9 @@ from src.pedidos.schema import (
 from src.produtos.model import ProdutoAdicional, ProdutoVariacao
 from src.unidades.model import Unidade
 
+PONTOS_RESGATE_FIDELIDADE = 12
+VALOR_DESCONTO_FIDELIDADE = Decimal("17.00")
+
 
 def listar_pedidos(db: Session, filtro: PedidoFiltro) -> list[Pedido]:
     query = db.query(Pedido)
@@ -72,8 +75,20 @@ def _validar_pedido_nao_cancelado(pedido: Pedido) -> None:
 def _validar_cliente_unidade(db: Session, data: PedidoCreate) -> None:
     if not db.get(Unidade, data.unidade_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unidade nao encontrada")
-    if data.cliente_id is not None and not db.get(Cliente, data.cliente_id):
+    cliente = db.get(Cliente, data.cliente_id) if data.cliente_id is not None else None
+    if data.cliente_id is not None and not cliente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado")
+    if data.usar_desconto_fidelidade:
+        if not cliente:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Desconto de fidelidade exige cliente cadastrado",
+            )
+        if cliente.pontos_fidelidade < PONTOS_RESGATE_FIDELIDADE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cliente nao possui pontos suficientes para resgate",
+            )
 
 
 def _validar_variacao_disponivel(
@@ -157,7 +172,9 @@ def _recalcular_totais(pedido: Pedido) -> None:
         adicionais_total = sum((adicional.preco for adicional in item.adicionais), Decimal("0"))
         total += item.quantidade * (item.preco_unitario + adicionais_total)
     pedido.subtotal = total
-    pedido.total = total
+    desconto = VALOR_DESCONTO_FIDELIDADE if pedido.pontos_fidelidade_utilizados else Decimal("0")
+    pedido.desconto_fidelidade = min(desconto, pedido.subtotal)
+    pedido.total = max(pedido.subtotal - pedido.desconto_fidelidade, Decimal("0"))
 
 
 def criar_pedido(db: Session, data: PedidoCreate) -> Pedido:
@@ -167,6 +184,7 @@ def criar_pedido(db: Session, data: PedidoCreate) -> Pedido:
         nome_comanda=data.nome_comanda,
         cliente_id=data.cliente_id,
         observacao=data.observacao,
+        pontos_fidelidade_utilizados=PONTOS_RESGATE_FIDELIDADE if data.usar_desconto_fidelidade else 0,
     )
     pedido.itens = [_criar_item(pedido, item_data, 1, db) for item_data in data.itens]
     _recalcular_totais(pedido)
@@ -188,30 +206,6 @@ def adicionar_itens(db: Session, pedido_id: int, data: AdicionarItensPedido) -> 
     db.commit()
     db.refresh(pedido)
     return pedido
-
-
-def atualizar_status_item(
-    db: Session,
-    item_id: int,
-    novo_status: StatusItemPedido,
-) -> ItemPedido:
-    item = obter_item(db, item_id)
-    _validar_pedido_nao_cancelado(item.pedido)
-
-    if novo_status == StatusItemPedido.cancelado:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Use a rota de cancelamento para cancelar item",
-        )
-    if item.status == StatusItemPedido.cancelado:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item cancelado")
-    if item.status == StatusItemPedido.entregue and novo_status != StatusItemPedido.entregue:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item entregue nao pode voltar status")
-
-    item.status = novo_status
-    db.commit()
-    db.refresh(item)
-    return item
 
 
 def _copiar_adicionais(item: ItemPedido) -> list[ItemPedidoAdicional]:
@@ -292,19 +286,31 @@ def finalizar_pedido(db: Session, pedido_id: int, data: FinalizarPedido) -> Pedi
     _validar_pedido_aberto(pedido)
     _recalcular_totais(pedido)
 
-    if pedido.total <= 0:
+    if not any(item.status != StatusItemPedido.cancelado for item in pedido.itens):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pedido sem itens para pagamento")
 
-    if pedido.cliente_id is not None and not pedido.pontos_fidelidade_creditados:
-        cliente = db.get(Cliente, pedido.cliente_id)
-        if cliente:
-            pontos = sum(
-                item.quantidade * item.produto_variacao.produto.pontos_fidelidade_por_unidade
-                for item in pedido.itens
-                if item.status != StatusItemPedido.cancelado
+    cliente = db.get(Cliente, pedido.cliente_id) if pedido.cliente_id is not None else None
+    if pedido.pontos_fidelidade_utilizados:
+        if not cliente:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Desconto de fidelidade exige cliente cadastrado",
             )
-            cliente.pontos_fidelidade += pontos
-            pedido.pontos_fidelidade_creditados = True
+        if cliente.pontos_fidelidade < pedido.pontos_fidelidade_utilizados:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cliente nao possui pontos suficientes para resgate",
+            )
+        cliente.pontos_fidelidade -= pedido.pontos_fidelidade_utilizados
+
+    if cliente is not None and not pedido.pontos_fidelidade_creditados:
+        pontos = sum(
+            item.quantidade * item.produto_variacao.produto.pontos_fidelidade_por_unidade
+            for item in pedido.itens
+            if item.status != StatusItemPedido.cancelado
+        )
+        cliente.pontos_fidelidade += pontos
+        pedido.pontos_fidelidade_creditados = True
 
     pedido.status = StatusPedido.pago
     pedido.forma_pagamento = data.forma_pagamento
@@ -390,13 +396,10 @@ def atualizar_status_cozinha(db: Session, data: AtualizarStatusCozinha) -> list[
         item
         for item in pedido.itens
         if item.lote == data.lote
-        and item.produto_variacao_id == data.produto_variacao_id
-        and item.observacao == data.observacao
         and item.status in {StatusItemPedido.aberto, StatusItemPedido.preparando}
-        and _assinatura_adicionais(item) == tuple(sorted(data.adicional_ids))
     ]
     if not itens:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grupo de cozinha nao encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote de cozinha nao encontrado")
 
     for item in itens:
         item.status = data.status

@@ -51,6 +51,86 @@ def test_criar_pagar_e_manter_item_na_cozinha(cliente, cardapio_base):
 
 
 @pytest.mark.integration
+def test_resgate_fidelidade_aplica_desconto_e_debita_pontos_no_pagamento(cliente, cardapio_base):
+    cardapio_base["cliente"].pontos_fidelidade = 12
+
+    resposta_pedido = cliente.post(
+        "/pedidos/",
+        json={
+            "unidade_id": cardapio_base["unidade"].id,
+            "nome_comanda": "Cliente Fidelidade",
+            "cliente_id": cardapio_base["cliente"].id,
+            "usar_desconto_fidelidade": True,
+            "itens": [
+                {
+                    "produto_variacao_id": cardapio_base["variacao"].id,
+                    "quantidade": 1,
+                    "observacao": None,
+                    "adicional_ids": [],
+                }
+            ],
+        },
+    )
+    assert resposta_pedido.status_code == 201
+    pedido = resposta_pedido.json()
+    assert pedido["subtotal"] == "19.90"
+    assert pedido["desconto_fidelidade"] == "17.00"
+    assert pedido["total"] == "2.90"
+    assert pedido["pontos_fidelidade_utilizados"] == 12
+
+    resposta_pagamento = cliente.post(
+        f"/pedidos/{pedido['id']}/finalizar",
+        json={"forma_pagamento": "dinheiro"},
+    )
+    assert resposta_pagamento.status_code == 200
+
+    resposta_cliente = cliente.get(f"/clientes/{cardapio_base['cliente'].id}")
+    assert resposta_cliente.status_code == 200
+    assert resposta_cliente.json()["pontos_fidelidade"] == 1
+
+
+@pytest.mark.integration
+def test_status_cozinha_atualiza_todos_os_itens_do_lote(cliente, cardapio_base):
+    resposta_pedido = cliente.post(
+        "/pedidos/",
+        json={
+            "unidade_id": cardapio_base["unidade"].id,
+            "nome_comanda": "Lote Cozinha",
+            "cliente_id": None,
+            "itens": [
+                {
+                    "produto_variacao_id": cardapio_base["variacao"].id,
+                    "quantidade": 1,
+                    "observacao": "Sem milho",
+                    "adicional_ids": [cardapio_base["adicionais"][0].id],
+                },
+                {
+                    "produto_variacao_id": cardapio_base["variacao"].id,
+                    "quantidade": 1,
+                    "observacao": "Sem batata",
+                    "adicional_ids": [cardapio_base["adicionais"][1].id],
+                },
+            ],
+        },
+    )
+    assert resposta_pedido.status_code == 201
+    pedido = resposta_pedido.json()
+
+    resposta_status = cliente.patch(
+        "/pedidos/cozinha/status",
+        json={
+            "pedido_id": pedido["id"],
+            "lote": 1,
+            "status": "preparando",
+        },
+    )
+    assert resposta_status.status_code == 200
+    itens = resposta_status.json()
+    assert len(itens) == 2
+    assert {item["status"] for item in itens} == {"preparando"}
+
+
+@pytest.mark.integration
 def test_cancelamento_parcial_divide_item(cliente, cardapio_base):
     resposta_pedido = cliente.post(
         "/pedidos/",

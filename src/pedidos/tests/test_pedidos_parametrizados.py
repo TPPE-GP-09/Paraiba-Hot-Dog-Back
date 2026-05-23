@@ -65,9 +65,6 @@ def test_status_permitidos_na_cozinha(cliente, cardapio_base, status_cozinha, st
         json={
             "pedido_id": pedido["id"],
             "lote": 1,
-            "produto_variacao_id": cardapio_base["variacao"].id,
-            "observacao": "Sem milho",
-            "adicional_ids": [cardapio_base["adicionais"][0].id],
             "status": status_cozinha,
         },
     )
@@ -104,3 +101,36 @@ def test_formas_pagamento(cliente, cardapio_base, forma_pagamento):
     assert resposta_pagamento.status_code == 200
     assert resposta_pagamento.json()["status"] == "pago"
     assert resposta_pagamento.json()["forma_pagamento"] == forma_pagamento
+
+
+@pytest.mark.parametrize(
+    "cliente_id, pontos_cliente, status_esperado",
+    [
+        (None, 0, 400),
+        ("cliente", 11, 400),
+        ("cliente", 12, 201),
+    ],
+)
+def test_validacoes_desconto_fidelidade(cliente, cardapio_base, cliente_id, pontos_cliente, status_esperado):
+    cardapio_base["cliente"].pontos_fidelidade = pontos_cliente
+    cliente_id_payload = cardapio_base["cliente"].id if cliente_id == "cliente" else None
+
+    resposta = cliente.post(
+        "/pedidos/",
+        json={
+            "unidade_id": cardapio_base["unidade"].id,
+            "nome_comanda": "Resgate Fidelidade",
+            "cliente_id": cliente_id_payload,
+            "usar_desconto_fidelidade": True,
+            "itens": [
+                {
+                    "produto_variacao_id": cardapio_base["variacao"].id,
+                    "quantidade": 1,
+                    "observacao": None,
+                    "adicional_ids": [],
+                }
+            ],
+        },
+    )
+
+    assert resposta.status_code == status_esperado
