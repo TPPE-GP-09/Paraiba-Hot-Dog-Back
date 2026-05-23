@@ -1,0 +1,405 @@
+from collections import OrderedDict
+from datetime import datetime
+from decimal import Decimal
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from src.clientes.model import Cliente
+from src.pedidos.model import (
+    FormaPagamento,
+    ItemPedido,
+    ItemPedidoAdicional,
+    Pedido,
+    StatusItemPedido,
+    StatusPedido,
+)
+from src.pedidos.schema import (
+    AdicionarItensPedido,
+    AtualizarStatusCozinha,
+    CancelarItemPedido,
+    CancelarPedido,
+    CozinhaAdicionalRead,
+    CozinhaItemRead,
+    FinalizarPedido,
+    ItemPedidoCreate,
+    PedidoCreate,
+    PedidoFiltro,
+)
+from src.produtos.model import ProdutoAdicional, ProdutoVariacao
+from src.unidades.model import Unidade
+
+
+def listar_pedidos(db: Session, filtro: PedidoFiltro) -> list[Pedido]:
+    query = db.query(Pedido)
+    if filtro.unidade_id is not None:
+        query = query.filter(Pedido.unidade_id == filtro.unidade_id)
+    if filtro.status is not None:
+        query = query.filter(Pedido.status == filtro.status)
+    return query.order_by(Pedido.created_at.desc()).offset(filtro.skip).limit(filtro.limit).all()
+
+
+def obter_pedido(db: Session, pedido_id: int) -> Pedido:
+    pedido = db.get(Pedido, pedido_id)
+    if not pedido:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido nao encontrado")
+    return pedido
+
+
+def obter_item(db: Session, item_id: int) -> ItemPedido:
+    item = db.get(ItemPedido, item_id)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item do pedido nao encontrado")
+    return item
+
+
+def _validar_pedido_aberto(pedido: Pedido) -> None:
+    if pedido.status != StatusPedido.aberto:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pedido precisa estar aberto",
+        )
+
+
+def _validar_pedido_nao_cancelado(pedido: Pedido) -> None:
+    if pedido.status == StatusPedido.cancelado:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pedido cancelado",
+        )
+
+
+def _validar_cliente_unidade(db: Session, data: PedidoCreate) -> None:
+    if not db.get(Unidade, data.unidade_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unidade nao encontrada")
+    if data.cliente_id is not None and not db.get(Cliente, data.cliente_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado")
+
+
+def _validar_variacao_disponivel(
+    db: Session,
+    unidade_id: int,
+    produto_variacao_id: int,
+) -> ProdutoVariacao:
+    variacao = db.get(ProdutoVariacao, produto_variacao_id)
+    if not variacao:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variacao nao encontrada")
+    if not variacao.ativo:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variacao inativa")
+
+    produto = variacao.produto
+    if not produto.ativo:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto inativo")
+
+    if not produto.disponivel_todas_unidades and unidade_id not in produto.unidade_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Produto indisponivel para esta unidade",
+        )
+
+    return variacao
+
+
+def _nome_variacao(variacao: ProdutoVariacao) -> str:
+    return variacao.nome
+
+
+def _obter_adicionais(db: Session, produto_id: int, adicional_ids: list[int]) -> list[ProdutoAdicional]:
+    if not adicional_ids:
+        return []
+
+    adicionais = (
+        db.query(ProdutoAdicional)
+        .filter(
+            ProdutoAdicional.id.in_(adicional_ids),
+            ProdutoAdicional.produto_id == produto_id,
+        )
+        .all()
+    )
+    if len(adicionais) != len(set(adicional_ids)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Adicional invalido para o produto",
+        )
+    return adicionais
+
+
+def _criar_item(pedido: Pedido, data: ItemPedidoCreate, lote: int, db: Session) -> ItemPedido:
+    variacao = _validar_variacao_disponivel(db, pedido.unidade_id, data.produto_variacao_id)
+    item = ItemPedido(
+        pedido=pedido,
+        produto_variacao_id=variacao.id,
+        produto_id=variacao.produto_id,
+        produto_nome=variacao.produto.nome,
+        produto_variacao_nome=_nome_variacao(variacao),
+        quantidade=data.quantidade,
+        preco_unitario=variacao.preco,
+        observacao=data.observacao,
+        lote=lote,
+    )
+    adicionais = _obter_adicionais(db, variacao.produto_id, data.adicional_ids)
+    item.adicionais = [
+        ItemPedidoAdicional(
+            adicional_id=adicional.id,
+            nome=adicional.nome,
+            preco=adicional.preco,
+        )
+        for adicional in adicionais
+    ]
+    return item
+
+
+def _recalcular_totais(pedido: Pedido) -> None:
+    total = Decimal("0")
+    for item in pedido.itens:
+        if item.status == StatusItemPedido.cancelado:
+            continue
+        adicionais_total = sum((adicional.preco for adicional in item.adicionais), Decimal("0"))
+        total += item.quantidade * (item.preco_unitario + adicionais_total)
+    pedido.subtotal = total
+    pedido.total = total
+
+
+def criar_pedido(db: Session, data: PedidoCreate) -> Pedido:
+    _validar_cliente_unidade(db, data)
+    pedido = Pedido(
+        unidade_id=data.unidade_id,
+        nome_comanda=data.nome_comanda,
+        cliente_id=data.cliente_id,
+        observacao=data.observacao,
+    )
+    pedido.itens = [_criar_item(pedido, item_data, 1, db) for item_data in data.itens]
+    _recalcular_totais(pedido)
+
+    db.add(pedido)
+    db.commit()
+    db.refresh(pedido)
+    return pedido
+
+
+def adicionar_itens(db: Session, pedido_id: int, data: AdicionarItensPedido) -> Pedido:
+    pedido = obter_pedido(db, pedido_id)
+    _validar_pedido_aberto(pedido)
+    proximo_lote = max((item.lote for item in pedido.itens), default=0) + 1
+    for item_data in data.itens:
+        pedido.itens.append(_criar_item(pedido, item_data, proximo_lote, db))
+    _recalcular_totais(pedido)
+
+    db.commit()
+    db.refresh(pedido)
+    return pedido
+
+
+def atualizar_status_item(
+    db: Session,
+    item_id: int,
+    novo_status: StatusItemPedido,
+) -> ItemPedido:
+    item = obter_item(db, item_id)
+    _validar_pedido_nao_cancelado(item.pedido)
+
+    if novo_status == StatusItemPedido.cancelado:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use a rota de cancelamento para cancelar item",
+        )
+    if item.status == StatusItemPedido.cancelado:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item cancelado")
+    if item.status == StatusItemPedido.entregue and novo_status != StatusItemPedido.entregue:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item entregue nao pode voltar status")
+
+    item.status = novo_status
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def _copiar_adicionais(item: ItemPedido) -> list[ItemPedidoAdicional]:
+    return [
+        ItemPedidoAdicional(
+            adicional_id=adicional.adicional_id,
+            nome=adicional.nome,
+            preco=adicional.preco,
+        )
+        for adicional in item.adicionais
+    ]
+
+
+def cancelar_item(db: Session, item_id: int, data: CancelarItemPedido) -> Pedido:
+    item = obter_item(db, item_id)
+    pedido = item.pedido
+    _validar_pedido_aberto(pedido)
+
+    if item.status == StatusItemPedido.entregue:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item entregue nao pode ser cancelado")
+    if item.status == StatusItemPedido.cancelado:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item ja cancelado")
+
+    quantidade_cancelada = data.quantidade or item.quantidade
+    if quantidade_cancelada > item.quantidade:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantidade maior que a do item")
+
+    if quantidade_cancelada == item.quantidade:
+        item.status = StatusItemPedido.cancelado
+        item.motivo_cancelamento = data.motivo_cancelamento
+        item.cancelado_em = datetime.utcnow()
+    else:
+        item.quantidade -= quantidade_cancelada
+        item_cancelado = ItemPedido(
+            pedido=pedido,
+            produto_variacao_id=item.produto_variacao_id,
+            produto_id=item.produto_id,
+            produto_nome=item.produto_nome,
+            produto_variacao_nome=item.produto_variacao_nome,
+            quantidade=quantidade_cancelada,
+            preco_unitario=item.preco_unitario,
+            observacao=item.observacao,
+            status=StatusItemPedido.cancelado,
+            lote=item.lote,
+            motivo_cancelamento=data.motivo_cancelamento,
+            cancelado_em=datetime.utcnow(),
+            adicionais=_copiar_adicionais(item),
+        )
+        db.add(item_cancelado)
+
+    _recalcular_totais(pedido)
+    db.commit()
+    db.refresh(pedido)
+    return pedido
+
+
+def cancelar_pedido(db: Session, pedido_id: int, data: CancelarPedido) -> Pedido:
+    pedido = obter_pedido(db, pedido_id)
+    _validar_pedido_aberto(pedido)
+
+    for item in pedido.itens:
+        if item.status in {StatusItemPedido.aberto, StatusItemPedido.preparando}:
+            item.status = StatusItemPedido.cancelado
+            item.motivo_cancelamento = data.motivo_cancelamento
+            item.cancelado_em = datetime.utcnow()
+
+    if not any(item.status == StatusItemPedido.entregue for item in pedido.itens):
+        pedido.status = StatusPedido.cancelado
+
+    _recalcular_totais(pedido)
+    db.commit()
+    db.refresh(pedido)
+    return pedido
+
+
+def finalizar_pedido(db: Session, pedido_id: int, data: FinalizarPedido) -> Pedido:
+    pedido = obter_pedido(db, pedido_id)
+    _validar_pedido_aberto(pedido)
+    _recalcular_totais(pedido)
+
+    if pedido.total <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pedido sem itens para pagamento")
+
+    if pedido.cliente_id is not None and not pedido.pontos_fidelidade_creditados:
+        cliente = db.get(Cliente, pedido.cliente_id)
+        if cliente:
+            pontos = sum(
+                item.quantidade * item.produto_variacao.produto.pontos_fidelidade_por_unidade
+                for item in pedido.itens
+                if item.status != StatusItemPedido.cancelado
+            )
+            cliente.pontos_fidelidade += pontos
+            pedido.pontos_fidelidade_creditados = True
+
+    pedido.status = StatusPedido.pago
+    pedido.forma_pagamento = data.forma_pagamento
+    pedido.fechado_em = datetime.utcnow()
+
+    db.commit()
+    db.refresh(pedido)
+    return pedido
+
+
+def _assinatura_adicionais(item: ItemPedido) -> tuple[int | None, ...]:
+    return tuple(sorted(adicional.adicional_id for adicional in item.adicionais))
+
+
+def _status_grupo(itens: list[ItemPedido]) -> StatusItemPedido:
+    if any(item.status == StatusItemPedido.preparando for item in itens):
+        return StatusItemPedido.preparando
+    return StatusItemPedido.aberto
+
+
+def listar_cozinha(db: Session, unidade_id: int | None = None) -> list[CozinhaItemRead]:
+    query = (
+        db.query(ItemPedido)
+        .join(ItemPedido.pedido)
+        .filter(
+            Pedido.status != StatusPedido.cancelado,
+            ItemPedido.status.in_([StatusItemPedido.aberto, StatusItemPedido.preparando]),
+        )
+    )
+    if unidade_id is not None:
+        query = query.filter(Pedido.unidade_id == unidade_id)
+
+    grupos: OrderedDict[tuple, list[ItemPedido]] = OrderedDict()
+    for item in query.order_by(Pedido.created_at.asc(), ItemPedido.lote.asc(), ItemPedido.id.asc()).all():
+        chave = (
+            item.pedido_id,
+            item.produto_variacao_id,
+            item.observacao,
+            item.lote,
+            _assinatura_adicionais(item),
+        )
+        grupos.setdefault(chave, []).append(item)
+
+    resposta: list[CozinhaItemRead] = []
+    for itens in grupos.values():
+        primeiro = itens[0]
+        resposta.append(
+            CozinhaItemRead(
+                pedido_id=primeiro.pedido_id,
+                nome_comanda=primeiro.pedido.nome_comanda,
+                lote=primeiro.lote,
+                produto_variacao_id=primeiro.produto_variacao_id,
+                produto_id=primeiro.produto_id,
+                produto_nome=primeiro.produto_nome,
+                produto_variacao_nome=primeiro.produto_variacao_nome,
+                observacao=primeiro.observacao,
+                status=_status_grupo(itens),
+                quantidade=sum(item.quantidade for item in itens),
+                adicionais=[
+                    CozinhaAdicionalRead(
+                        adicional_id=adicional.adicional_id,
+                        nome=adicional.nome,
+                        preco=adicional.preco,
+                    )
+                    for adicional in primeiro.adicionais
+                ],
+            )
+        )
+    return resposta
+
+
+def atualizar_status_cozinha(db: Session, data: AtualizarStatusCozinha) -> list[ItemPedido]:
+    if data.status not in {StatusItemPedido.preparando, StatusItemPedido.entregue}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Status de cozinha invalido",
+        )
+
+    pedido = obter_pedido(db, data.pedido_id)
+    _validar_pedido_nao_cancelado(pedido)
+
+    itens = [
+        item
+        for item in pedido.itens
+        if item.lote == data.lote
+        and item.produto_variacao_id == data.produto_variacao_id
+        and item.observacao == data.observacao
+        and item.status in {StatusItemPedido.aberto, StatusItemPedido.preparando}
+        and _assinatura_adicionais(item) == tuple(sorted(data.adicional_ids))
+    ]
+    if not itens:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grupo de cozinha nao encontrado")
+
+    for item in itens:
+        item.status = data.status
+
+    db.commit()
+    return itens

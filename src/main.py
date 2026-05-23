@@ -6,6 +6,7 @@ from src.produtos.router import router as produtos_router
 from src.unidades.router import router as unidades_router
 from src.permissoes.router import router as permissoes_router
 from src.blog.router import router as blog_router
+from src.pedidos.router import router as pedidos_router
 from src.security import get_current_user
 
 app = FastAPI(title="Paraiba Hot Dog API")
@@ -46,6 +47,12 @@ app.include_router(
     blog_router,
     prefix="/blog",
     tags=["blog"],
+    dependencies=auth_dependencies,
+)
+app.include_router(
+    pedidos_router,
+    prefix="/pedidos",
+    tags=["pedidos"],
     dependencies=auth_dependencies,
 )
 
