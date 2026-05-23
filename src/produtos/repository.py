@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -11,14 +12,17 @@ from src.produtos.model import (
 )
 from src.produtos.schema import (
     CategoriaCreate,
+    CategoriaUpdate,
     ProdutoCreate,
     ProdutoUpdate,
     ProdutoVariacaoCreate,
     ProdutoVariacaoUpdate,
     SubcategoriaCreate,
+    SubcategoriaUpdate,
     ProdutoAdicionalCreate,
     ProdutoAdicionalUpdate,
 )
+from src.unidades.model import Unidade
 
 
 def listar_categorias(db: Session) -> list[Categoria]:
@@ -42,6 +46,57 @@ def criar_categoria(db: Session, data: CategoriaCreate) -> Categoria:
         ) from None
 
     return obj
+
+
+def obter_categoria(db: Session, categoria_id: int) -> Categoria:
+    categoria = db.get(Categoria, categoria_id)
+    if not categoria:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Categoria nao encontrada",
+        )
+    return categoria
+
+
+def atualizar_categoria(
+    db: Session,
+    categoria_id: int,
+    data: CategoriaUpdate,
+) -> Categoria:
+    categoria = obter_categoria(db, categoria_id)
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(categoria, key, value)
+
+    try:
+        db.commit()
+        db.refresh(categoria)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Erro ao atualizar categoria",
+        ) from None
+
+    return categoria
+
+
+def excluir_categoria(db: Session, categoria_id: int) -> None:
+    categoria = obter_categoria(db, categoria_id)
+    if categoria.subcategorias:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Categoria possui subcategorias vinculadas",
+        )
+
+    try:
+        db.delete(categoria)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Erro ao excluir categoria",
+        ) from None
 
 
 def listar_subcategorias(db: Session) -> list[Subcategoria]:
@@ -75,8 +130,79 @@ def criar_subcategoria(db: Session, data: SubcategoriaCreate) -> Subcategoria:
     return obj
 
 
-def listar_produtos(db: Session, skip: int, limit: int) -> list[Produto]:
-    return db.query(Produto).offset(skip).limit(limit).all()
+def obter_subcategoria(db: Session, subcategoria_id: int) -> Subcategoria:
+    subcategoria = db.get(Subcategoria, subcategoria_id)
+    if not subcategoria:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subcategoria nao encontrada",
+        )
+    return subcategoria
+
+
+def atualizar_subcategoria(
+    db: Session,
+    subcategoria_id: int,
+    data: SubcategoriaUpdate,
+) -> Subcategoria:
+    subcategoria = obter_subcategoria(db, subcategoria_id)
+
+    if data.categoria_id is not None and not db.get(Categoria, data.categoria_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Categoria nao encontrada",
+        )
+
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(subcategoria, key, value)
+
+    try:
+        db.commit()
+        db.refresh(subcategoria)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Erro ao atualizar subcategoria",
+        ) from None
+
+    return subcategoria
+
+
+def excluir_subcategoria(db: Session, subcategoria_id: int) -> None:
+    subcategoria = obter_subcategoria(db, subcategoria_id)
+    if subcategoria.produtos:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Subcategoria possui produtos vinculados",
+        )
+
+    try:
+        db.delete(subcategoria)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Erro ao excluir subcategoria",
+        ) from None
+
+
+def listar_produtos(
+    db: Session,
+    skip: int,
+    limit: int,
+    unidade_id: int | None = None,
+) -> list[Produto]:
+    query = db.query(Produto)
+    if unidade_id is not None:
+        query = query.filter(
+            or_(
+                Produto.disponivel_todas_unidades.is_(True),
+                Produto.unidades.any(Unidade.id == unidade_id),
+            )
+        )
+    return query.offset(skip).limit(limit).all()
 
 
 def obter_produto(db: Session, produto_id: int) -> Produto:
@@ -91,6 +217,36 @@ def obter_produto(db: Session, produto_id: int) -> Produto:
     return produto
 
 
+def _obter_unidades(db: Session, unidade_ids: list[int]) -> list[Unidade]:
+    unidades = db.query(Unidade).filter(Unidade.id.in_(unidade_ids)).all()
+    if len(unidades) != len(set(unidade_ids)):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unidade nao encontrada",
+        )
+    return unidades
+
+
+def _aplicar_disponibilidade(
+    db: Session,
+    produto: Produto,
+    disponivel_todas_unidades: bool,
+    unidade_ids: list[int],
+) -> None:
+    produto.disponivel_todas_unidades = disponivel_todas_unidades
+    if disponivel_todas_unidades:
+        produto.unidades = []
+        return
+
+    if not unidade_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe ao menos uma unidade para produto restrito",
+        )
+
+    produto.unidades = _obter_unidades(db, unidade_ids)
+
+
 def criar_produto(db: Session, data: ProdutoCreate) -> Produto:
     subcategoria = db.get(Subcategoria, data.subcategoria_id)
 
@@ -100,7 +256,14 @@ def criar_produto(db: Session, data: ProdutoCreate) -> Produto:
             detail="Subcategoria nao encontrada",
         )
 
-    db_produto = Produto(**data.model_dump())
+    payload = data.model_dump(exclude={"unidade_ids"})
+    db_produto = Produto(**payload)
+    _aplicar_disponibilidade(
+        db,
+        db_produto,
+        data.disponivel_todas_unidades,
+        data.unidade_ids,
+    )
 
     try:
         db.add(db_produto)
@@ -134,8 +297,18 @@ def atualizar_produto(
                 detail="Subcategoria nao encontrada",
             )
 
-    for key, value in data.model_dump(exclude_unset=True).items():
+    payload = data.model_dump(exclude_unset=True, exclude={"unidade_ids"})
+
+    for key, value in payload.items():
         setattr(db_produto, key, value)
+
+    if data.unidade_ids is not None or data.disponivel_todas_unidades is not None:
+        _aplicar_disponibilidade(
+            db,
+            db_produto,
+            db_produto.disponivel_todas_unidades,
+            data.unidade_ids if data.unidade_ids is not None else db_produto.unidade_ids,
+        )
 
     try:
         db.commit()

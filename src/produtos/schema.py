@@ -73,6 +73,10 @@ class ProdutoBase(BaseModel):
 
     ativo: bool = True
 
+    pontos_fidelidade_por_unidade: int = Field(default=0, ge=0)
+
+    disponivel_todas_unidades: bool = True
+
     subcategoria_id: int = Field(
         ...,
         gt=0,
@@ -80,7 +84,7 @@ class ProdutoBase(BaseModel):
 
 
 class ProdutoCreate(ProdutoBase):
-    pass
+    unidade_ids: list[int] = []
 
 
 class ProdutoUpdate(BaseModel):
@@ -98,6 +102,12 @@ class ProdutoUpdate(BaseModel):
 
     ativo: Optional[bool] = None
 
+    pontos_fidelidade_por_unidade: Optional[int] = Field(None, ge=0)
+
+    disponivel_todas_unidades: Optional[bool] = None
+
+    unidade_ids: Optional[list[int]] = None
+
     subcategoria_id: Optional[int] = Field(
         None,
         gt=0,
@@ -110,6 +120,11 @@ class ProdutoVariacaoBase(BaseModel):
         gt=0,
     )
 
+    nome: str = Field(
+        ...,
+        max_length=80,
+    )
+
     tipo: TipoVariacao
 
     preco: Decimal = Field(
@@ -118,16 +133,7 @@ class ProdutoVariacaoBase(BaseModel):
         decimal_places=2,
     )
 
-    preco_combo: Optional[Decimal] = Field(
-        None,
-        gt=0,
-        decimal_places=2,
-    )
-
-    label_combo: Optional[str] = Field(
-        None,
-        max_length=50,
-    )
+    ativo: bool = True
 
 
 class ProdutoVariacaoCreate(ProdutoVariacaoBase):
@@ -135,6 +141,11 @@ class ProdutoVariacaoCreate(ProdutoVariacaoBase):
 
 
 class ProdutoVariacaoUpdate(BaseModel):
+    nome: Optional[str] = Field(
+        None,
+        max_length=80,
+    )
+
     tipo: Optional[TipoVariacao] = None
 
     preco: Optional[Decimal] = Field(
@@ -143,16 +154,7 @@ class ProdutoVariacaoUpdate(BaseModel):
         decimal_places=2,
     )
 
-    preco_combo: Optional[Decimal] = Field(
-        None,
-        gt=0,
-        decimal_places=2,
-    )
-
-    label_combo: Optional[str] = Field(
-        None,
-        max_length=50,
-    )
+    ativo: Optional[bool] = None
 
 
 class ProdutoVariacaoRead(ProdutoVariacaoBase):
@@ -202,6 +204,8 @@ class ProdutoAdicionalRead(ProdutoAdicionalBase):
 
 class ProdutoRead(ProdutoBase):
     id: int
+
+    unidade_ids: list[int] = []
 
     variacoes: list[ProdutoVariacaoRead] = []
 
