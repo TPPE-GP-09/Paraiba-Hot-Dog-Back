@@ -4,13 +4,13 @@ import pytest
     "rota, dados_requisicao, status_esperado",
     [
         # 201 Created: Criação com sucesso de produtos com dados válidos.
-        ("/produtos/variacoes", {"tipo": "normal", "preco": 10.50}, 201),
-        ("/produtos/adicionais", {"nome": "Adicional Teste", "preco": 2.50}, 201),
+        ("/produtos/variacoes", {"nome": "Tradicional Duplo", "tipo": "normal", "preco": 23.90}, 201),
+        ("/produtos/adicionais", {"nome": "Maionese Artesanal de Bacon", "preco": 3.00}, 201),
         
         # 422 Unprocessable Entity: Validação de erros (preços negativos, campos obrigatórios ausentes).
-        ("/produtos/variacoes", {"tipo": "normal", "preco": -5.00}, 422),
-        ("/produtos/adicionais", {"nome": "Invalido", "preco": -1.00}, 422),
-        ("/produtos/variacoes", {"preco": 10.50}, 422),
+        ("/produtos/variacoes", {"nome": "Combo Tradicional", "tipo": "combo", "preco": -32.90}, 422),
+        ("/produtos/adicionais", {"nome": "Maionese Invalida", "preco": -3.00}, 422),
+        ("/produtos/variacoes", {"nome": "Combo Tradicional", "preco": 32.90}, 422),
         ("/produtos/adicionais", {"preco": 5.00}, 422),
     ]
 )

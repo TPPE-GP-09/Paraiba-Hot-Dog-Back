@@ -6,6 +6,7 @@ from src.produtos import repository
 from src.produtos.schema import (
     CategoriaCreate,
     CategoriaRead,
+    CategoriaUpdate,
     ProdutoCreate,
     ProdutoRead,
     ProdutoUpdate,
@@ -14,6 +15,7 @@ from src.produtos.schema import (
     ProdutoVariacaoUpdate,
     SubcategoriaCreate,
     SubcategoriaRead,
+    SubcategoriaUpdate,
     ProdutoAdicionalCreate,
     ProdutoAdicionalRead,
     ProdutoAdicionalUpdate,
@@ -42,6 +44,29 @@ def criar_categoria(
 ) -> CategoriaRead:
     return repository.criar_categoria(db, data)
 
+
+@router.patch(
+    "/categorias/{categoria_id}",
+    response_model=CategoriaRead,
+)
+def atualizar_categoria(
+    categoria_id: int,
+    data: CategoriaUpdate,
+    db: Session = Depends(get_db),
+) -> CategoriaRead:
+    return repository.atualizar_categoria(db, categoria_id, data)
+
+
+@router.delete(
+    "/categorias/{categoria_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def excluir_categoria(
+    categoria_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    repository.excluir_categoria(db, categoria_id)
+
 @router.get(
     "/subcategorias",
     response_model=list[SubcategoriaRead],
@@ -62,6 +87,29 @@ def criar_subcategoria(
     db: Session = Depends(get_db),
 ) -> SubcategoriaRead:
     return repository.criar_subcategoria(db, data)
+
+
+@router.patch(
+    "/subcategorias/{subcategoria_id}",
+    response_model=SubcategoriaRead,
+)
+def atualizar_subcategoria(
+    subcategoria_id: int,
+    data: SubcategoriaUpdate,
+    db: Session = Depends(get_db),
+) -> SubcategoriaRead:
+    return repository.atualizar_subcategoria(db, subcategoria_id, data)
+
+
+@router.delete(
+    "/subcategorias/{subcategoria_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def excluir_subcategoria(
+    subcategoria_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    repository.excluir_subcategoria(db, subcategoria_id)
 
 
 @router.get(
@@ -175,9 +223,10 @@ def excluir_adicional(
 def listar_produtos(
     skip: int = 0,
     limit: int = Query(100, le=100),
+    unidade_id: int | None = Query(None, gt=0),
     db: Session = Depends(get_db),
 ) -> list[ProdutoRead]:
-    return repository.listar_produtos(db, skip, limit)
+    return repository.listar_produtos(db, skip, limit, unidade_id)
 
 
 @router.get(

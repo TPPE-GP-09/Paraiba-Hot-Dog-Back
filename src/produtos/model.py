@@ -6,10 +6,13 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
+    Column,
     Enum as SQLEnum,
     ForeignKey,
+    Integer,
     Numeric,
     String,
+    Table,
     Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -17,7 +20,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.database import Base
 
 if TYPE_CHECKING:
-    pass
+    from src.unidades.model import Unidade
+
+
+produto_unidades = Table(
+    "produto_unidades",
+    Base.metadata,
+    Column("produto_id", ForeignKey("produtos.id"), primary_key=True),
+    Column("unidade_id", ForeignKey("unidades.id"), primary_key=True),
+)
 
 
 class Categoria(Base):
@@ -92,6 +103,18 @@ class Produto(Base):
         nullable=False,
     )
 
+    pontos_fidelidade_por_unidade: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+
+    disponivel_todas_unidades: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+
     subcategoria_id: Mapped[int] = mapped_column(
         ForeignKey("subcategorias.id"),
         nullable=False,
@@ -115,6 +138,16 @@ class Produto(Base):
         cascade="all, delete-orphan",
     )
 
+    unidades: Mapped[list[Unidade]] = relationship(
+        "Unidade",
+        secondary=produto_unidades,
+        lazy="selectin",
+    )
+
+    @property
+    def unidade_ids(self) -> list[int]:
+        return [unidade.id for unidade in self.unidades]
+
 
 class TipoVariacao(str, Enum):
     normal = "normal"
@@ -131,6 +164,11 @@ class ProdutoVariacao(Base):
         nullable=False,
     )
 
+    nome: Mapped[str] = mapped_column(
+        String(80),
+        nullable=False,
+    )
+
     tipo: Mapped[TipoVariacao] = mapped_column(
         SQLEnum(TipoVariacao, name="tipo_variacao"),
         nullable=False,
@@ -141,14 +179,10 @@ class ProdutoVariacao(Base):
         nullable=False,
     )
 
-    preco_combo: Mapped[Decimal | None] = mapped_column(
-        Numeric(10, 2),
-        nullable=True,
-    )
-
-    label_combo: Mapped[str | None] = mapped_column(
-        String(50),
-        nullable=True,
+    ativo: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
     )
 
     produto: Mapped[Produto] = relationship(

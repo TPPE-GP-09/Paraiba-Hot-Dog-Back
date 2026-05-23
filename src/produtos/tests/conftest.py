@@ -47,22 +47,24 @@ def fixture_cliente():
 
 @pytest.fixture
 def dados_base(cliente):
-    resposta_categoria = cliente.post("/produtos/categorias", json={"nome": "Categoria Teste"})
+    resposta_categoria = cliente.post("/produtos/categorias", json={"nome": "Hot-Dog"})
     assert resposta_categoria.status_code == 201
     categoria = resposta_categoria.json()
 
     resposta_subcategoria = cliente.post("/produtos/subcategorias", json={
-        "nome": "Subcategoria Teste", 
+        "nome": "Molho",
         "categoria_id": categoria["id"]
     })
     assert resposta_subcategoria.status_code == 201
     subcategoria = resposta_subcategoria.json()
 
     resposta_produto = cliente.post("/produtos/", json={
-        "nome": "Produto Teste",
-        "descricao": "Descricao",
-        "imagem_url": "http://img.com/img.png",
+        "nome": "Tradicional",
+        "descricao": "Pao de leite Ninho, salsicha Perdigao, queijo mucarela, molho de tomate, milho e batata palha.",
+        "imagem_url": None,
         "ativo": True,
+        "pontos_fidelidade_por_unidade": 1,
+        "disponivel_todas_unidades": True,
         "subcategoria_id": subcategoria["id"]
     })
     assert resposta_produto.status_code == 201
