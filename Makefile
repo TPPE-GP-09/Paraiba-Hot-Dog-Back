@@ -1,14 +1,14 @@
 SHELL := /bin/bash
 POETRY := poetry
 
-.PHONY: help install shell run test pytest integration-test keycloak-up keycloak-token token docs docs-build tox docker-build docker-up docker-down logs migrate alembic-revision
+.PHONY: help install shell run test pytest integration-test keycloak-up keycloak-token token docs docs-build tox docker-build docker-up docker-down logs migrate seed docker-seed alembic-revision
 
 help:
 	@echo "Available targets:"
 	@echo "  install        : Install dependencies with poetry"
 	@echo "  shell          : Enter poetry shell"
 	@echo "  run            : Run dev server (uvicorn)"
-	@echo "  test           : Run pytest with coverage"
+	@echo "  test           : Start services, generate Keycloak token, and run pytest with coverage"
 	@echo "  pytest         : Run pytest with optional TEST variable: make pytest TEST=src/unidades/test_unidades.py"
 	@echo "  integration-test : Start Keycloak, generate token, and run integration tests"
 	@echo "  keycloak-up    : Start Keycloak with imported test realm"
@@ -20,6 +20,8 @@ help:
 	@echo "  docker-down    : Stop services"
 	@echo "  logs           : Tail docker-compose logs"
 	@echo "  migrate        : Run alembic upgrade head"
+	@echo "  seed           : Run migrations and seed local database"
+	@echo "  docker-seed    : Run seeds inside the API container"
 	@echo "  lint           : Run linter (pylint)"
 	@echo "  format         : Run code formatter (black)"
 	@echo "  typecheck      : Run static type checks (mypy)"
@@ -34,7 +36,7 @@ run:
 	$(POETRY) run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 test:
-	$(POETRY) run pytest --cov=src --cov-report=term-missing -v
+	scripts/run-tests.sh -v
 
 pytest:
 	$(POETRY) run pytest $(TEST)
@@ -71,6 +73,12 @@ logs:
 
 migrate:
 	$(POETRY) run alembic upgrade head
+
+seed: migrate
+	$(POETRY) run python scripts/seed.py
+
+docker-seed:
+	docker compose exec paraiba-hotdog-back python scripts/seed.py
 
 alembic-revision:
 	$(POETRY) run alembic revision --autogenerate -m "$(MSG)"

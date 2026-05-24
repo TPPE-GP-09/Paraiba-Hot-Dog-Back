@@ -21,8 +21,7 @@ def _auth_exception(detail: str = "Credenciais invalidas") -> HTTPException:
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=detail,
         headers={"WWW-Authenticate": "Bearer"},
-    )
-
+    )t
 
 def _fetch_jwks() -> dict[str, Any]:
     """Busca e guarda em cache as chaves publicas JWKS publicadas pelo Keycloak."""
