@@ -4,6 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+# pylint: disable=redefined-outer-name
+
 from src.database import Base, get_db
 from src.main import app
 
