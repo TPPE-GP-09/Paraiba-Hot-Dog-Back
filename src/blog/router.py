@@ -10,8 +10,8 @@ router = APIRouter()
 
 
 @router.get("/", response_model=list[BlogRead])
-def listar_posts(tip: str | None = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return repository.listar_posts(db, tip, skip, limit)
+def listar_posts(tipo: str | None = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return repository.listar_posts(db, tipo, skip, limit)
 
 
 @router.get("/{post_id}", response_model=BlogRead)
