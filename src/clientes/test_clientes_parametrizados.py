@@ -23,12 +23,15 @@ test_engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(
-    autocommit=False, autoflush=False, bind=test_engine)
+    autocommit=False,
+    autoflush=False,
+    bind=test_engine,
+)
 
 
 @pytest.fixture(scope="function")
 def db_session():
-    """Cria uma nova sessão de banco de dados para cada teste."""
+    """Cria uma nova sessao de banco de dados para cada teste."""
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
     try:
@@ -40,12 +43,14 @@ def db_session():
 
 @pytest.fixture
 def override_get_db(db_session):
-    """Substitui a dependência get_db pela sessão de teste."""
+    """Substitui a dependencia get_db pela sessao de teste."""
+
     def _get_db():
         try:
             yield db_session
         finally:
             pass
+
     app.dependency_overrides[get_db] = _get_db
     yield
     app.dependency_overrides.clear()
@@ -53,7 +58,7 @@ def override_get_db(db_session):
 
 @pytest.fixture
 def cliente_valido(db_session):
-    """Cria um cliente válido para os testes."""
+    """Cria um cliente valido para os testes."""
     cliente = Cliente(
         nome="Maria Silva",
         telefone="83999990001",
@@ -77,7 +82,7 @@ class TestClientes:
         assert response.json() == []
 
     def test_criar_cliente(self, override_get_db):
-        """Testa criação de cliente com telefone sanitizado."""
+        """Testa criacao de cliente com telefone sanitizado."""
         payload = {
             "nome": "Joao Gabriel",
             "telefone": "(61) 9856-12117",
@@ -96,14 +101,16 @@ class TestClientes:
     def test_listar_clientes_com_filtro(self, override_get_db, cliente_valido):
         """Testa listagem com filtro por telefone."""
         response = client.get(
-            "/clientes/", params={"telefone": cliente_valido.telefone})
+            "/clientes/",
+            params={"telefone": cliente_valido.telefone},
+        )
         assert response.status_code == 200
         data = response.json()
         assert len(data) == 1
         assert data[0]["id"] == cliente_valido.id
 
     def test_obter_cliente_por_id(self, override_get_db, cliente_valido):
-        """Testa obtenção de cliente por ID."""
+        """Testa obtencao de cliente por ID."""
         response = client.get(f"/clientes/{cliente_valido.id}")
         assert response.status_code == 200
         data = response.json()
@@ -111,13 +118,13 @@ class TestClientes:
         assert data["nome"] == "Maria Silva"
 
     def test_obter_cliente_inexistente(self, override_get_db):
-        """Testa obtenção de cliente inexistente."""
+        """Testa obtencao de cliente inexistente."""
         response = client.get("/clientes/9999")
         assert response.status_code == 404
         assert "Cliente nao encontrado" in response.json()["detail"]
 
     def test_atualizar_cliente(self, override_get_db, cliente_valido):
-        """Testa atualização de cliente existente."""
+        """Testa atualizacao de cliente existente."""
         payload = {"nome": "Maria Atualizada"}
         response = client.patch(f"/clientes/{cliente_valido.id}", json=payload)
         assert response.status_code == 200
@@ -125,13 +132,13 @@ class TestClientes:
         assert data["nome"] == "Maria Atualizada"
 
     def test_atualizar_cliente_inexistente(self, override_get_db):
-        """Testa atualização de cliente inexistente."""
+        """Testa atualizacao de cliente inexistente."""
         payload = {"nome": "Nao existe"}
         response = client.patch("/clientes/9999", json=payload)
         assert response.status_code == 404
 
     def test_excluir_cliente_soft_delete(self, override_get_db, cliente_valido):
-        """Testa exclusão lógica de cliente."""
+        """Testa exclusao logica de cliente."""
         response = client.delete(f"/clientes/{cliente_valido.id}")
         assert response.status_code == 204
 
@@ -143,7 +150,7 @@ class TestClientes:
         assert response.json() == []
 
     def test_excluir_cliente_inexistente(self, override_get_db):
-        """Testa exclusão de cliente inexistente."""
+        """Testa exclusao de cliente inexistente."""
         response = client.delete("/clientes/9999")
         assert response.status_code == 404
 
@@ -160,7 +167,7 @@ class TestClientes:
         assert "Telefone ja cadastrado" in response.json()["detail"]
 
     def test_validacao_email(self, override_get_db):
-        """Testa validação de email inválido."""
+        """Testa validacao de email invalido."""
         payload = {
             "nome": "Invalido",
             "telefone": "83999990002",
