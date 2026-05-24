@@ -1,17 +1,17 @@
-"""Tests for blog endpoints."""
+"""Testes parametrizados para os endpoints de blog."""
 
-# Pylint doesn't understand pytest fixtures in this module.
 # pylint: disable=redefined-outer-name,unused-argument
 
 from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.main import app
 from src.database import Base, get_db
+from src.main import app
 from src.blog.model import Blog, TipoNoticiaPromocao
 
 client = TestClient(app)
@@ -28,6 +28,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 @pytest.fixture(scope="function")
 def db_session():
+    """Cria uma nova sessao de banco de dados para cada teste."""
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
     try:
@@ -39,6 +40,8 @@ def db_session():
 
 @pytest.fixture
 def override_get_db(db_session):
+    """Substitui a dependencia get_db pela sessao de teste."""
+
     def _get_db():
         try:
             yield db_session
@@ -52,6 +55,7 @@ def override_get_db(db_session):
 
 @pytest.fixture
 def post_valido(db_session):
+    """Cria um post valido para usar nos testes."""
     post = Blog(
         titulo="Nova Unidade Abre",
         imagem_url="https://example.com/post.jpg",
@@ -66,12 +70,16 @@ def post_valido(db_session):
 
 
 class TestBlog:
+    """Testes para os endpoints de blog."""
+
     def test_listar_vazio(self, override_get_db):
+        """Testa listagem de posts quando vazio."""
         response = client.get("/blog/")
         assert response.status_code == 200
         assert response.json() == []
 
     def test_criar_post(self, override_get_db):
+        """Testa criacao de um novo post."""
         payload = {
             "titulo": "Promoção de Verão",
             "imagem_url": "https://example.com/promo.jpg",
@@ -86,6 +94,7 @@ class TestBlog:
         assert data["tipo"] == "promocao"
 
     def test_listar_com_dados(self, override_get_db, post_valido):
+        """Testa listagem de posts com dados."""
         response = client.get("/blog/")
         assert response.status_code == 200
         items = response.json()
@@ -93,6 +102,7 @@ class TestBlog:
         assert items[0]["titulo"] == "Nova Unidade Abre"
 
     def test_filtrar_por_tipo(self, override_get_db, db_session):
+        """Testa filtragem de posts por tipo."""
         # cria dois posts de tipos diferentes
         p1 = Blog(titulo="Notícia 1", tipo=TipoNoticiaPromocao.noticia, data=date(2026, 4, 1))
         p2 = Blog(titulo="Promo 1", tipo=TipoNoticiaPromocao.promocao, data=date(2026, 4, 2))
@@ -106,6 +116,7 @@ class TestBlog:
         assert items[0]["tipo"] == "noticia"
 
     def test_obter_por_id(self, override_get_db, post_valido):
+        """Testa obtencao de um post especifico."""
         response = client.get(f"/blog/{post_valido.id}")
         assert response.status_code == 200
         data = response.json()
@@ -113,6 +124,7 @@ class TestBlog:
         assert data["titulo"] == "Nova Unidade Abre"
 
     def test_atualizar_post(self, override_get_db, post_valido):
+        """Testa atualizacao de um post."""
         payload = {"titulo": "Novo Título"}
         response = client.patch(f"/blog/{post_valido.id}", json=payload)
         assert response.status_code == 200
@@ -120,6 +132,7 @@ class TestBlog:
         assert data["titulo"] == "Novo Título"
 
     def test_excluir_post(self, override_get_db, post_valido):
+        """Testa delecao de um post."""
         response = client.delete(f"/blog/{post_valido.id}")
         assert response.status_code == 204
 
@@ -127,7 +140,12 @@ class TestBlog:
         assert response.status_code == 404
 
     def test_criar_invalido(self, override_get_db):
+        """Testa criacao de post com dados invalidos."""
         # sem titulo
-        payload = {"imagem_url": "https://example.com/x.jpg", "tipo": "noticia", "data": "2026-05-01"}
+        payload = {
+            "imagem_url": "https://example.com/x.jpg",
+            "tipo": "noticia",
+            "data": "2026-05-01",
+        }
         response = client.post("/blog/", json=payload)
         assert response.status_code == 422
