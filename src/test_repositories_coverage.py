@@ -17,38 +17,51 @@ from src.usuarios import repository as usuarios_repository
 
 
 class FakeQuery:
+    """Query fake minima para simular filtros e listagens do SQLAlchemy."""
+
     def __init__(self, items):
+        """Armazena os itens retornados pela query fake."""
         self.items = items
 
     def filter(self, *_args):
+        """Simula encadeamento de filtro sem alterar os itens."""
         return self
 
     def order_by(self, *_args):
+        """Simula ordenacao mantendo a mesma query fake."""
         return self
 
     def all(self):
+        """Retorna todos os itens configurados na query fake."""
         return self.items
 
 
 class FakeIntegrityOrig:
+    """Origem fake para construir IntegrityError com mensagem controlada."""
+
     def __init__(self, message):
+        """Guarda a mensagem de erro de integridade."""
         self.message = message
 
     def __str__(self):
+        """Retorna a mensagem como texto do erro original."""
         return self.message
 
 
 def integrity_error(message: str) -> IntegrityError:
+    """Cria um IntegrityError com mensagem previsivel para os testes."""
     return IntegrityError("statement", "params", FakeIntegrityOrig(message))
 
 
 def permissao(permissao_id=1, nome=TipoPermissao.dashboard):
+    """Monta uma permissao fake para os testes de repository."""
     item = Permissao(id=permissao_id, nome=nome)
     item.usuarios = []
     return item
 
 
 def usuario(usuario_id=1):
+    """Monta um usuario fake para os testes de repository."""
     item = Usuario(
         id=usuario_id,
         keycloak_id="kc-1",
@@ -62,6 +75,7 @@ def usuario(usuario_id=1):
 
 
 def unidade(unidade_id=1, endereco=None):
+    """Monta uma unidade fake para os testes de repository."""
     return Unidade(
         id=unidade_id,
         nome="Centro",
@@ -75,6 +89,7 @@ def unidade(unidade_id=1, endereco=None):
 
 
 def test_resolver_permissoes_retorna_todas():
+    """Garante que todas as permissoes solicitadas sao retornadas."""
     db = Mock()
     itens = [permissao(1), permissao(2, TipoPermissao.cozinha)]
     db.query.return_value = FakeQuery(itens)
@@ -85,6 +100,7 @@ def test_resolver_permissoes_retorna_todas():
 
 
 def test_resolver_permissoes_lanca_404_quando_falta_id():
+    """Valida erro quando algum ID de permissao nao existe."""
     db = Mock()
     db.query.return_value = FakeQuery([permissao(1)])
 
@@ -96,6 +112,7 @@ def test_resolver_permissoes_lanca_404_quando_falta_id():
 
 
 def test_validar_unidade_ignora_none_e_rejeita_inexistente():
+    """Garante que unidade opcional e ignorada e inexistente retorna 404."""
     db = Mock()
 
     usuarios_repository._validar_unidade(db, None)
@@ -117,6 +134,7 @@ def test_validar_unidade_ignora_none_e_rejeita_inexistente():
     ],
 )
 def test_tratar_integridade_mapeia_erros(mensagem, status_code, detail):
+    """Valida o mapeamento de erros de integridade para HTTPException."""
     exc = usuarios_repository._tratar_integridade(integrity_error(mensagem))
 
     assert exc.status_code == status_code
@@ -124,6 +142,7 @@ def test_tratar_integridade_mapeia_erros(mensagem, status_code, detail):
 
 
 def test_create_usuario_cria_no_keycloak_e_no_banco(monkeypatch):
+    """Garante criacao de usuario local sincronizado com Keycloak."""
     db = Mock()
     db.query.return_value = FakeQuery([permissao()])
     db.get.return_value = unidade()
@@ -148,6 +167,7 @@ def test_create_usuario_cria_no_keycloak_e_no_banco(monkeypatch):
 
 
 def test_create_usuario_remove_keycloak_quando_commit_falha(monkeypatch):
+    """Valida compensacao no Keycloak quando o commit local falha."""
     db = Mock()
     db.query.return_value = FakeQuery([])
     db.get.return_value = None
@@ -173,6 +193,7 @@ def test_create_usuario_remove_keycloak_quando_commit_falha(monkeypatch):
 
 
 def test_list_get_update_delete_usuario(monkeypatch):
+    """Cobre listagem, busca, atualizacao e delecao de usuario."""
     item = usuario()
     db = Mock()
     db.query.return_value = FakeQuery([item])
@@ -206,6 +227,7 @@ def test_list_get_update_delete_usuario(monkeypatch):
 
 
 def test_update_usuario_valida_unidade_permissoes_e_integridade(monkeypatch):
+    """Valida update de usuario com permissoes e rollback em erro."""
     item = usuario()
     db = Mock()
     db.get.return_value = item
@@ -226,6 +248,7 @@ def test_update_usuario_valida_unidade_permissoes_e_integridade(monkeypatch):
 
 
 def test_get_usuario_nao_encontrado():
+    """Garante 404 ao buscar usuario inexistente."""
     db = Mock()
     db.get.return_value = None
 
@@ -236,6 +259,7 @@ def test_get_usuario_nao_encontrado():
 
 
 def test_permissoes_repository_fluxo_feliz():
+    """Cobre o fluxo feliz completo do repository de permissoes."""
     db = Mock()
     item = permissao()
     user = usuario()
@@ -261,6 +285,7 @@ def test_permissoes_repository_fluxo_feliz():
 
 
 def test_permissoes_repository_erros():
+    """Cobre erros de busca, criacao e atualizacao de permissao."""
     db = Mock()
     db.get.return_value = None
 
@@ -285,6 +310,7 @@ def test_permissoes_repository_erros():
 
 
 def test_conceder_e_revogar_permissao_com_erros():
+    """Valida erros ao conceder e revogar permissoes de usuario."""
     item = permissao()
     user = usuario()
     user.permissoes = [item]
@@ -308,6 +334,7 @@ def test_conceder_e_revogar_permissao_com_erros():
 
 
 def test_unidades_repository_fluxos_de_criacao_atualizacao_e_exclusao():
+    """Cobre criacao, atualizacao, listagem, busca e exclusao de unidade."""
     db = Mock()
     endereco = Endereco(
         id=1,
@@ -361,6 +388,7 @@ def test_unidades_repository_fluxos_de_criacao_atualizacao_e_exclusao():
 
 
 def test_atualizar_unidade_cria_endereco_quando_nao_existe():
+    """Garante criacao de endereco ao atualizar unidade sem endereco."""
     item = unidade(endereco=None)
     db = Mock()
     db.get.return_value = item
@@ -376,6 +404,7 @@ def test_atualizar_unidade_cria_endereco_quando_nao_existe():
 
 
 def test_obter_unidade_nao_encontrada():
+    """Garante 404 ao buscar unidade inexistente."""
     db = Mock()
     db.get.return_value = None
 

@@ -30,6 +30,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 @pytest.fixture(scope="function")
 def db_session():
+    """Cria uma sessao SQLite isolada para cada teste de blog."""
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
     try:
@@ -41,7 +42,9 @@ def db_session():
 
 @pytest.fixture
 def override_get_db(db_session):
+    """Substitui a dependencia get_db pela sessao de teste."""
     def _get_db():
+        """Fornece a sessao fake para o FastAPI durante o teste."""
         try:
             yield db_session
         finally:
@@ -54,6 +57,7 @@ def override_get_db(db_session):
 
 @pytest.fixture
 def authenticated_user():
+    """Simula um usuario autenticado para rotas protegidas."""
     app.dependency_overrides[get_current_user] = lambda: {
         "sub": "test-user",
         "roles": ["administrador"],
@@ -64,6 +68,7 @@ def authenticated_user():
 
 @pytest.fixture
 def post_valido(db_session):
+    """Cria um post valido para os cenarios de leitura e escrita."""
     post = Blog(
         titulo="Nova Unidade Abre",
         imagem_url="https://example.com/post.jpg",
@@ -78,12 +83,14 @@ def post_valido(db_session):
 
 
 def test_listar_vazio(override_get_db):
+    """Garante que a listagem vazia retorna lista vazia."""
     response = client.get("/blog/")
     assert response.status_code == 200
     assert response.json() == []
 
 
 def test_listar_com_dados(override_get_db, post_valido):
+    """Garante que a listagem retorna posts cadastrados."""
     response = client.get("/blog/")
     assert response.status_code == 200
     items = response.json()
@@ -92,6 +99,7 @@ def test_listar_com_dados(override_get_db, post_valido):
 
 
 def test_filtrar_por_tipo(override_get_db, db_session):
+    """Garante filtro de posts por tipo."""
     p1 = Blog(titulo="Notícia 1", tipo=TipoNoticiaPromocao.noticia, data=date(2026, 4, 1))
     p2 = Blog(titulo="Promo 1", tipo=TipoNoticiaPromocao.promocao, data=date(2026, 4, 2))
     db_session.add_all([p1, p2])
@@ -105,6 +113,7 @@ def test_filtrar_por_tipo(override_get_db, db_session):
 
 
 def test_obter_por_id(override_get_db, post_valido):
+    """Garante busca de post por ID."""
     response = client.get(f"/blog/{post_valido.id}")
     assert response.status_code == 200
     data = response.json()
@@ -113,6 +122,7 @@ def test_obter_por_id(override_get_db, post_valido):
 
 
 def test_atualizar_post(override_get_db, authenticated_user, post_valido):
+    """Garante atualizacao de post autenticada."""
     payload = {"titulo": "Novo Título"}
     response = client.patch(f"/blog/{post_valido.id}", json=payload)
     assert response.status_code == 200
@@ -121,6 +131,7 @@ def test_atualizar_post(override_get_db, authenticated_user, post_valido):
 
 
 def test_excluir_post(override_get_db, authenticated_user, post_valido):
+    """Garante exclusao de post autenticada."""
     response = client.delete(f"/blog/{post_valido.id}")
     assert response.status_code == 204
 

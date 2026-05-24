@@ -10,17 +10,20 @@ pytestmark = pytest.mark.integration
 
 
 def _unique_email(prefix: str) -> str:
+    """Gera um e-mail unico para testes de usuarios."""
     stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
     return f"{prefix}.{stamp}@example.com"
 
 
 def _auth_headers() -> dict[str, str]:
+    """Retorna headers de autenticacao ou pula o teste sem token."""
     if not API_AUTH_TOKEN:
         pytest.skip("Defina API_AUTH_TOKEN para rodar os testes de integracao.")
     return {"Authorization": f"Bearer {API_AUTH_TOKEN}"}
 
 
 def _create_unidade() -> int:
+    """Cria uma unidade real para vincular usuarios de integracao."""
     payload = {
         "nome": f"Unidade Teste {datetime.now(UTC).strftime('%H%M%S%f')}",
         "imagem": None,
@@ -45,6 +48,7 @@ def _create_unidade() -> int:
 
 @pytest.fixture(name="api_client")
 def fixture_api_client() -> httpx.Client:
+    """Cria um cliente HTTP autenticado para os testes de usuarios."""
     with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         try:
             health = client.get(f"{BASE_URL}/")
@@ -56,6 +60,7 @@ def fixture_api_client() -> httpx.Client:
 
 @pytest.fixture(name="cleanup_ids")
 def fixture_cleanup_ids():
+    """Remove usuarios e unidades criados durante o teste."""
     tracked = {"usuarios": [], "unidades": []}
     yield tracked
     if not API_AUTH_TOKEN:
@@ -71,6 +76,7 @@ def test_atualizar_usuario_com_unidade_inexistente_retorna_404(
     api_client: httpx.Client,
     cleanup_ids,
 ) -> None:
+    """Garante 404 ao atualizar usuario com unidade inexistente."""
     unidade_id = _create_unidade()
     cleanup_ids["unidades"].append(unidade_id)
     create_payload = {
@@ -96,6 +102,7 @@ def test_atualizar_usuario_com_unidade_inexistente_retorna_404(
 
 
 def test_listar_usuarios_retorna_200(api_client: httpx.Client) -> None:
+    """Garante que a listagem de usuarios responde com sucesso."""
     response = api_client.get(f"{BASE_URL}/usuarios/")
 
     assert response.status_code == 200, response.text
@@ -103,6 +110,7 @@ def test_listar_usuarios_retorna_200(api_client: httpx.Client) -> None:
 
 
 def test_obter_usuario_existente_retorna_200(api_client: httpx.Client, cleanup_ids) -> None:
+    """Garante busca de usuario existente pela API real."""
     unidade_id = _create_unidade()
     cleanup_ids["unidades"].append(unidade_id)
     payload = {
@@ -127,6 +135,7 @@ def test_obter_usuario_existente_retorna_200(api_client: httpx.Client, cleanup_i
 
 
 def test_obter_usuario_inexistente_retorna_404(api_client: httpx.Client) -> None:
+    """Garante 404 ao buscar usuario inexistente."""
     response = api_client.get(f"{BASE_URL}/usuarios/999999999")
 
     assert response.status_code == 404, response.text
@@ -134,6 +143,7 @@ def test_obter_usuario_inexistente_retorna_404(api_client: httpx.Client) -> None
 
 
 def test_deletar_usuario_remove_e_get_retorna_404(api_client: httpx.Client, cleanup_ids) -> None:
+    """Garante remocao de usuario e 404 na busca posterior."""
     unidade_id = _create_unidade()
     cleanup_ids["unidades"].append(unidade_id)
     payload = {

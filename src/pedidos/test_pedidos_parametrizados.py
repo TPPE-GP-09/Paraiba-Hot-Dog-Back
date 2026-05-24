@@ -36,6 +36,7 @@ TestingSessionLocal = sessionmaker(
 
 @pytest.fixture(scope="function")
 def db_session():
+    """Cria uma sessao SQLite isolada para cada teste de pedidos."""
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
     try:
@@ -47,7 +48,9 @@ def db_session():
 
 @pytest.fixture(autouse=True)
 def override_get_db(db_session):
+    """Substitui a dependencia get_db pela sessao de teste."""
     def _get_db():
+        """Fornece a sessao fake para o FastAPI durante o teste."""
         try:
             yield db_session
         finally:
@@ -60,11 +63,13 @@ def override_get_db(db_session):
 
 @pytest.fixture(name="cliente")
 def fixture_cliente():
+    """Cria o TestClient usado nos cenarios parametrizados."""
     return TestClient(app)
 
 
 @pytest.fixture
 def cardapio_base(db_session):
+    """Cria unidade, produto, variacao, adicionais e cliente base."""
     endereco = Endereco(
         cep="71900000",
         logradouro="Aguas Claras",
@@ -162,6 +167,7 @@ def cardapio_base(db_session):
     ],
 )
 def test_validacoes_criar_pedido(cliente, cardapio_base, payload, status_esperado):
+    """Garante validacoes de payload ao criar pedido."""
     if payload["unidade_id"] == 1:
         payload["unidade_id"] = cardapio_base["unidade"].id
 
@@ -178,6 +184,7 @@ def test_validacoes_criar_pedido(cliente, cardapio_base, payload, status_esperad
     ],
 )
 def test_status_permitidos_na_cozinha(cliente, cardapio_base, status_cozinha, status_esperado):
+    """Garante status permitidos e bloqueados na cozinha."""
     resposta_pedido = cliente.post(
         "/pedidos/",
         json={
@@ -213,6 +220,7 @@ def test_status_permitidos_na_cozinha(cliente, cardapio_base, status_cozinha, st
     ["pix", "credito", "debito", "dinheiro"],
 )
 def test_formas_pagamento(cliente, cardapio_base, forma_pagamento):
+    """Garante finalizacao de pedido com cada forma de pagamento."""
     resposta_pedido = cliente.post(
         "/pedidos/",
         json={
@@ -255,6 +263,7 @@ def test_validacoes_desconto_fidelidade(
     pontos_cliente,
     status_esperado,
 ):
+    """Garante regras de uso do desconto fidelidade."""
     cardapio_base["cliente"].pontos_fidelidade = pontos_cliente
     cliente_id_payload = cardapio_base["cliente"].id if cliente_id == "cliente" else None
 

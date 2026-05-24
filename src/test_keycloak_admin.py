@@ -8,32 +8,42 @@ from src import keycloak_admin
 
 
 class FakeResponse:
+    """Resposta HTTP fake usada para simular chamadas ao Keycloak."""
+
     def __init__(self, body: str = "", status: int = 200, headers: dict[str, str] | None = None):
+        """Guarda corpo, status e headers da resposta simulada."""
         self.body = body
         self.status = status
         self.headers = headers or {"content-type": "application/json"}
 
     def __enter__(self):
+        """Permite usar a resposta fake em um bloco with."""
         return self
 
     def __exit__(self, *args):
+        """Finaliza o contexto sem suprimir excecoes."""
         return False
 
     def read(self) -> bytes:
+        """Retorna o corpo fake em bytes, como urlopen faria."""
         return self.body.encode("utf-8")
 
     def close(self) -> None:
+        """Compatibiliza a resposta fake com HTTPError."""
         return None
 
 
 def http_error(status_code: int, body: str = "{}") -> HTTPError:
+    """Cria um HTTPError com corpo controlado para os testes."""
     return HTTPError("http://keycloak", status_code, "erro", {}, FakeResponse(body))
 
 
 def test_request_monta_json_form_headers_e_parseia_resposta(monkeypatch):
+    """Valida montagem de request JSON com token e parse da resposta."""
     capturado = {}
 
     def fake_urlopen(request, timeout):
+        """Captura a requisicao enviada pela funcao testada."""
         capturado["method"] = request.get_method()
         capturado["headers"] = dict(request.header_items())
         capturado["body"] = request.data.decode("utf-8")
@@ -60,9 +70,11 @@ def test_request_monta_json_form_headers_e_parseia_resposta(monkeypatch):
 
 
 def test_request_parseia_formulario(monkeypatch):
+    """Valida envio de dados form-url-encoded para o Keycloak."""
     capturado = {}
 
     def fake_urlopen(request, timeout):
+        """Captura corpo e headers do formulario enviado."""
         assert timeout == 10
         capturado["body"] = request.data.decode("utf-8")
         capturado["headers"] = dict(request.header_items())
@@ -83,6 +95,7 @@ def test_request_parseia_formulario(monkeypatch):
 
 
 def test_request_retorna_http_error_esperado(monkeypatch):
+    """Garante que status esperados em HTTPError sao retornados."""
     monkeypatch.setattr(
         keycloak_admin,
         "urlopen",
@@ -100,6 +113,7 @@ def test_request_retorna_http_error_esperado(monkeypatch):
 
 
 def test_request_converte_http_error_inesperado(monkeypatch):
+    """Garante conversao de erro HTTP inesperado em HTTPException."""
     monkeypatch.setattr(
         keycloak_admin,
         "urlopen",
@@ -114,6 +128,7 @@ def test_request_converte_http_error_inesperado(monkeypatch):
 
 
 def test_request_converte_falha_de_conexao(monkeypatch):
+    """Garante erro 502 quando o Keycloak esta indisponivel."""
     monkeypatch.setattr(
         keycloak_admin,
         "urlopen",
@@ -127,6 +142,7 @@ def test_request_converte_falha_de_conexao(monkeypatch):
 
 
 def test_keycloak_exception_mapeia_conflito_e_erro_generico():
+    """Valida o mapeamento dos erros administrativos do Keycloak."""
     assert keycloak_admin._keycloak_exception(409).status_code == 409
     erro = keycloak_admin._keycloak_exception(500)
     assert erro.status_code == 502
@@ -134,6 +150,7 @@ def test_keycloak_exception_mapeia_conflito_e_erro_generico():
 
 
 def test_admin_token_e_urls(monkeypatch):
+    """Valida montagem de URL administrativa e leitura do token admin."""
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_admin_base_url", "http://keycloak:8080/")
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_realm", "paraiba-hotdog")
     monkeypatch.setattr(
@@ -149,6 +166,7 @@ def test_admin_token_e_urls(monkeypatch):
 
 
 def test_busca_primeiro_id_e_usuario(monkeypatch):
+    """Garante leitura do primeiro ID e busca de usuario por e-mail."""
     assert keycloak_admin._first_id([{"id": "1"}]) == "1"
     assert keycloak_admin._first_id([]) is None
 
@@ -162,9 +180,11 @@ def test_busca_primeiro_id_e_usuario(monkeypatch):
 
 
 def test_garante_role_existente_ou_cria(monkeypatch):
+    """Valida criacao de role quando ela ainda nao existe no realm."""
     chamadas = []
 
     def fake_request(method, url, **kwargs):
+        """Simula ciclo de role ausente, criacao e nova consulta."""
         chamadas.append((method, url, kwargs))
         if len(chamadas) == 1:
             return 404, None, {}
@@ -179,6 +199,7 @@ def test_garante_role_existente_ou_cria(monkeypatch):
 
 
 def test_garante_role_retorna_existente(monkeypatch):
+    """Valida retorno imediato quando a role ja existe."""
     monkeypatch.setattr(
         keycloak_admin,
         "_request",
@@ -189,6 +210,7 @@ def test_garante_role_retorna_existente(monkeypatch):
 
 
 def test_reset_password_e_assign_role(monkeypatch):
+    """Garante reset de senha e atribuicao de role no usuario."""
     chamadas = []
     monkeypatch.setattr(keycloak_admin, "_ensure_realm_role", lambda _token, role: {"name": role})
     monkeypatch.setattr(
@@ -207,6 +229,7 @@ def test_reset_password_e_assign_role(monkeypatch):
 
 
 def test_create_keycloak_user_desligado(monkeypatch):
+    """Valida que a sincronizacao desligada nao chama o Keycloak."""
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_user_sync_enabled", False)
 
     assert keycloak_admin.create_keycloak_user(
@@ -218,6 +241,7 @@ def test_create_keycloak_user_desligado(monkeypatch):
 
 
 def test_create_keycloak_user_existente(monkeypatch):
+    """Garante atualizacao de senha/role quando o usuario ja existe."""
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_user_sync_enabled", True)
     monkeypatch.setattr(keycloak_admin, "_admin_token", lambda: "token")
     monkeypatch.setattr(keycloak_admin, "_find_user_id", lambda _token, _email: "user-1")
@@ -233,6 +257,7 @@ def test_create_keycloak_user_existente(monkeypatch):
 
 
 def test_create_keycloak_user_novo_com_location(monkeypatch):
+    """Garante criacao de usuario novo usando o ID do header Location."""
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_user_sync_enabled", True)
     monkeypatch.setattr(keycloak_admin, "_admin_token", lambda: "token")
     monkeypatch.setattr(keycloak_admin, "_find_user_id", lambda _token, _email: None)
@@ -257,6 +282,7 @@ def test_create_keycloak_user_novo_com_location(monkeypatch):
 
 
 def test_create_keycloak_user_falha_sem_id(monkeypatch):
+    """Valida erro quando o Keycloak nao informa o ID criado."""
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_user_sync_enabled", True)
     monkeypatch.setattr(keycloak_admin, "_admin_token", lambda: "token")
     monkeypatch.setattr(keycloak_admin, "_find_user_id", lambda _token, _email: None)
@@ -274,6 +300,7 @@ def test_create_keycloak_user_falha_sem_id(monkeypatch):
 
 
 def test_update_keycloak_user_atualiza_campos_senha_e_role(monkeypatch):
+    """Garante atualizacao de dados, senha e role do usuario."""
     chamadas = []
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_user_sync_enabled", True)
     monkeypatch.setattr(keycloak_admin, "_admin_token", lambda: "token")
@@ -308,6 +335,7 @@ def test_update_keycloak_user_atualiza_campos_senha_e_role(monkeypatch):
 
 
 def test_update_keycloak_user_ignora_sem_sync_ou_sem_id(monkeypatch):
+    """Valida retorno silencioso sem sync habilitado ou sem ID."""
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_user_sync_enabled", False)
 
     assert keycloak_admin.update_keycloak_user("user-1", nome="Teste") is None
@@ -317,6 +345,7 @@ def test_update_keycloak_user_ignora_sem_sync_ou_sem_id(monkeypatch):
 
 
 def test_delete_keycloak_user(monkeypatch):
+    """Garante delecao do usuario no Keycloak aceitando 204 ou 404."""
     chamadas = []
     monkeypatch.setattr(keycloak_admin.settings, "keycloak_user_sync_enabled", True)
     monkeypatch.setattr(keycloak_admin, "_admin_token", lambda: "token")

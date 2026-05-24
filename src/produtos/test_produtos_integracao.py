@@ -37,6 +37,7 @@ def override_get_db(db_session):
     """Substitui automaticamente a dependencia get_db do FastAPI pela sessao de teste."""
 
     def _get_db():
+        """Fornece a sessao fake para o FastAPI durante o teste."""
         try:
             yield db_session
         finally:
@@ -55,6 +56,7 @@ def fixture_cliente():
 
 @pytest.fixture
 def dados_base(cliente):
+    """Cria categoria, subcategoria e produto base para os testes."""
     resposta_categoria = cliente.post(
         "/produtos/categorias", json={"nome": "Hot-Dog"})
     assert resposta_categoria.status_code == 201
@@ -97,6 +99,7 @@ def dados_base(cliente):
 
 @pytest.mark.integration
 def test_relacionamentos_produto(cliente, dados_base):
+    """Garante variacoes e adicionais vinculados ao produto."""
     produto_id = dados_base["produto"]["id"]
 
     resposta_v = cliente.post(
@@ -134,6 +137,7 @@ def test_relacionamentos_produto(cliente, dados_base):
 
 @pytest.mark.integration
 def test_editar_categoria_e_subcategoria(cliente):
+    """Garante edicao e exclusao de categoria e subcategoria."""
     resposta_categoria = cliente.post(
         "/produtos/categorias", json={"nome": "Combos"})
     assert resposta_categoria.status_code == 201
