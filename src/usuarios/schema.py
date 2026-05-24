@@ -2,20 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from src.permissoes.model import TipoPermissao
-
-
-class PermissaoBase(BaseModel):
-    nome: TipoPermissao
-
-
-class PermissaoCreate(PermissaoBase):
-    pass
-
-
-class PermissaoRead(PermissaoBase):
-    id: int
-    model_config = ConfigDict(from_attributes=True)
+from src.permissoes.schema import PermissaoCreate, PermissaoRead
 
 
 class FuncaoUsuario(str, Enum):
@@ -47,5 +34,6 @@ class UsuarioUpdate(BaseModel):
 
 class UsuarioRead(UsuarioBase):
     id: int
+    keycloak_id: str | None = None
     permissoes: list[PermissaoRead] = []
     model_config = ConfigDict(from_attributes=True)

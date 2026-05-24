@@ -18,6 +18,7 @@ from src.produtos.schema import (
     ProdutoAdicionalRead,
     ProdutoAdicionalUpdate,
 )
+from src.security import get_current_user
 
 router = APIRouter()
 
@@ -35,6 +36,7 @@ def listar_categorias(
     "/categorias",
     response_model=CategoriaRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
 )
 def criar_categoria(
     data: CategoriaCreate,
@@ -56,6 +58,7 @@ def listar_subcategorias(
     "/subcategorias",
     response_model=SubcategoriaRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
 )
 def criar_subcategoria(
     data: SubcategoriaCreate,
@@ -78,6 +81,7 @@ def listar_variacoes(
     "/variacoes",
     response_model=ProdutoVariacaoRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
 )
 def criar_variacao(
     data: ProdutoVariacaoCreate,
@@ -89,6 +93,7 @@ def criar_variacao(
 @router.patch(
     "/variacoes/{variacao_id}",
     response_model=ProdutoVariacaoRead,
+    dependencies=[Depends(get_current_user)],
 )
 def atualizar_variacao(
     variacao_id: int,
@@ -105,6 +110,7 @@ def atualizar_variacao(
 @router.delete(
     "/variacoes/{variacao_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user)],
 )
 def excluir_variacao(
     variacao_id: int,
@@ -130,6 +136,7 @@ def listar_adicionais(
     "/adicionais",
     response_model=ProdutoAdicionalRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
 )
 def criar_adicional(
     data: ProdutoAdicionalCreate,
@@ -141,6 +148,7 @@ def criar_adicional(
 @router.patch(
     "/adicionais/{adicional_id}",
     response_model=ProdutoAdicionalRead,
+    dependencies=[Depends(get_current_user)],
 )
 def atualizar_adicional(
     adicional_id: int,
@@ -157,6 +165,7 @@ def atualizar_adicional(
 @router.delete(
     "/adicionais/{adicional_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user)],
 )
 def excluir_adicional(
     adicional_id: int,
@@ -195,6 +204,7 @@ def obter_produto(
     "/",
     response_model=ProdutoRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
 )
 def criar_produto(
     produto: ProdutoCreate,
@@ -206,6 +216,7 @@ def criar_produto(
 @router.patch(
     "/{produto_id}",
     response_model=ProdutoRead,
+    dependencies=[Depends(get_current_user)],
 )
 def atualizar_produto(
     produto_id: int,
@@ -222,6 +233,7 @@ def atualizar_produto(
 @router.delete(
     "/{produto_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user)],
 )
 def excluir_produto(
     produto_id: int,

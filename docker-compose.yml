@@ -10,6 +10,7 @@ services:
     environment:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
+      - KEYCLOAK_ADMIN_BASE_URL=http://keycloak:8080
     ports:
       - "8000:8000"
     volumes:

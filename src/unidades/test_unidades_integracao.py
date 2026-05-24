@@ -95,6 +95,30 @@ def test_obter_unidade_inexistente_retorna_404(api_client: httpx.Client) -> None
     assert response.json()["detail"] == "Unidade nao encontrada"
 
 
+def test_atualizar_unidade_altera_dados_e_endereco(api_client: httpx.Client, cleanup_ids) -> None:
+    create_response = api_client.post(f"{BASE_URL}/unidades/", json=_payload_unidade())
+    assert create_response.status_code == 201, create_response.text
+    unidade_id = create_response.json()["id"]
+    cleanup_ids.append(unidade_id)
+
+    patch_response = api_client.patch(
+        f"{BASE_URL}/unidades/{unidade_id}",
+        json={
+            "nome": "Unidade Integracao Atualizada",
+            "endereco": {
+                "cidade": "Campina Grande",
+                "bairro": "Centro",
+            },
+        },
+    )
+
+    assert patch_response.status_code == 200, patch_response.text
+    body = patch_response.json()
+    assert body["nome"] == "Unidade Integracao Atualizada"
+    assert body["endereco"]["cidade"] == "Campina Grande"
+    assert body["endereco"]["bairro"] == "Centro"
+
+
 def test_deletar_unidade_remove_e_get_retorna_404(
     api_client: httpx.Client,
     cleanup_ids,

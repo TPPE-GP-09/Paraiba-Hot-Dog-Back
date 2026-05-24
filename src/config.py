@@ -17,7 +17,11 @@ class Settings(BaseSettings):
         "http://keycloak:8080/realms/paraiba-hotdog/protocol/openid-connect/certs"
     )
     keycloak_client_id: str | None = None
-    keycloak_jwks_cache_seconds: int = 300
+    keycloak_jwks_cache_seconds: int = 3600
+    keycloak_admin_base_url: str = "http://localhost:8080"
+    keycloak_admin_username: str = "admin"
+    keycloak_admin_password: str = "admin"
+    keycloak_user_sync_enabled: bool = True
 
 
 settings = Settings()

@@ -18,6 +18,16 @@ class EnderecoCreate(EnderecoBase):
     pass
 
 
+class EnderecoUpdate(BaseModel):
+    cep: Optional[str] = None
+    logradouro: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cidade: Optional[str] = None
+    estado: Optional[str] = None
+
+
 class EnderecoRead(EnderecoBase):
     id: int
 
@@ -34,6 +44,15 @@ class UnidadeBase(BaseModel):
 
 class UnidadeCreate(UnidadeBase):
     endereco: EnderecoCreate
+
+
+class UnidadeUpdate(BaseModel):
+    nome: Optional[str] = None
+    imagem: Optional[str] = None
+    abertura: Optional[time] = None
+    fechamento: Optional[time] = None
+    descricao: Optional[str] = None
+    endereco: Optional[EnderecoUpdate] = None
 
 
 class UnidadeRead(UnidadeBase):

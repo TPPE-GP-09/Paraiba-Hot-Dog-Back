@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.main import app
 from src.database import Base, get_db
+from src.security import get_current_user
 from src.blog.model import Blog, TipoNoticiaPromocao
 
 client = TestClient(app)
@@ -51,6 +52,23 @@ def override_get_db(db_session):
 
 
 @pytest.fixture
+def authenticated_user():
+    app.dependency_overrides[get_current_user] = lambda: {
+        "sub": "test-user",
+        "roles": ["administrador"],
+    }
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture
+def unauthenticated_user():
+    app.dependency_overrides.pop(get_current_user, None)
+    yield
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture
 def post_valido(db_session):
     post = Blog(
         titulo="Nova Unidade Abre",
@@ -71,7 +89,7 @@ class TestBlog:
         assert response.status_code == 200
         assert response.json() == []
 
-    def test_criar_post(self, override_get_db):
+    def test_criar_post(self, override_get_db, authenticated_user):
         payload = {
             "titulo": "Promoção de Verão",
             "imagem_url": "https://example.com/promo.jpg",
@@ -112,21 +130,32 @@ class TestBlog:
         assert data["id"] == post_valido.id
         assert data["titulo"] == "Nova Unidade Abre"
 
-    def test_atualizar_post(self, override_get_db, post_valido):
+    def test_criar_post_sem_token_retorna_401(self, override_get_db, unauthenticated_user):
+        payload = {
+            "titulo": "Promoção de Verão",
+            "imagem_url": "https://example.com/promo.jpg",
+            "descricao": "Aproveite nossa promoção",
+            "tipo": "promocao",
+            "data": "2026-05-01",
+        }
+        response = client.post("/blog/", json=payload)
+        assert response.status_code == 401
+
+    def test_atualizar_post(self, override_get_db, authenticated_user, post_valido):
         payload = {"titulo": "Novo Título"}
         response = client.patch(f"/blog/{post_valido.id}", json=payload)
         assert response.status_code == 200
         data = response.json()
         assert data["titulo"] == "Novo Título"
 
-    def test_excluir_post(self, override_get_db, post_valido):
+    def test_excluir_post(self, override_get_db, authenticated_user, post_valido):
         response = client.delete(f"/blog/{post_valido.id}")
         assert response.status_code == 204
 
         response = client.get(f"/blog/{post_valido.id}")
         assert response.status_code == 404
 
-    def test_criar_invalido(self, override_get_db):
+    def test_criar_invalido(self, override_get_db, authenticated_user):
         # sem titulo
         payload = {"imagem_url": "https://example.com/x.jpg", "tipo": "noticia", "data": "2026-05-01"}
         response = client.post("/blog/", json=payload)

@@ -1,0 +1,17 @@
+site_name: Paraiba Hot Dog - Documentacao
+site_description: Documentacao tecnica do backend Paraiba Hot Dog.
+repo_name: TPPE-GP-09/Paraiba-Hot-Dog-Back
+theme:
+  name: readthedocs
+  language: pt-BR
+nav:
+  - Inicio: index.md
+  - Keycloak:
+      - Visao geral: keycloak/index.md
+      - Guia rapido: keycloak/guia-rapido.md
+      - Integracao com a API: keycloak/integracao-api.md
+      - Apresentacao: keycloak/apresentacao-keycloak.md
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true

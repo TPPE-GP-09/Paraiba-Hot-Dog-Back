@@ -7,25 +7,16 @@ from urllib.request import urlopen
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from src.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
 
 _jwks_cache: dict[str, Any] = {"keys": None, "expires_at": 0.0}
 
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-
 def _auth_exception(detail: str = "Credenciais invalidas") -> HTTPException:
+    """Cria uma resposta 401 padronizada para falhas de autenticacao Bearer."""
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=detail,
@@ -34,6 +25,7 @@ def _auth_exception(detail: str = "Credenciais invalidas") -> HTTPException:
 
 
 def _fetch_jwks() -> dict[str, Any]:
+    """Busca e guarda em cache as chaves publicas JWKS publicadas pelo Keycloak."""
     now = monotonic()
     cached_keys = _jwks_cache["keys"]
     if cached_keys and now < _jwks_cache["expires_at"]:
@@ -57,6 +49,7 @@ def _fetch_jwks() -> dict[str, Any]:
 
 
 def _get_signing_key(token: str) -> dict[str, Any]:
+    """Seleciona no JWKS a chave publica usada para assinar o token recebido."""
     try:
         header = jwt.get_unverified_header(token)
     except JWTError as exc:
@@ -74,9 +67,12 @@ def _get_signing_key(token: str) -> dict[str, Any]:
 
 
 def _extract_roles(payload: dict[str, Any]) -> list[str]:
+    """Extrai roles de realm e clients do payload JWT validado."""
     roles: set[str] = set()
     roles.update(payload.get("realm_access", {}).get("roles", []))
 
+    # pega roles de todos os clientes, pois o token pode conter permissoes
+    # de mais de um cliente dependendo da configuracao do Keycloak
     resource_access = payload.get("resource_access", {})
     for client_data in resource_access.values():
         roles.update(client_data.get("roles", []))
@@ -85,6 +81,7 @@ def _extract_roles(payload: dict[str, Any]) -> list[str]:
 
 
 def decode_keycloak_token(token: str) -> dict[str, Any]:
+    """Valida o JWT do Keycloak e retorna o payload com as roles normalizadas."""
     key = _get_signing_key(token)
     try:
         payload = jwt.decode(
@@ -112,6 +109,7 @@ def decode_keycloak_token(token: str) -> dict[str, Any]:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict[str, Any]:
+    """Dependencia FastAPI que exige token Bearer valido e retorna o usuario atual."""
     if credentials is None:
         raise _auth_exception("Token de autenticacao ausente")
 
@@ -122,7 +120,9 @@ def get_current_user(
 
 
 def require_roles(*required_roles: str) -> Callable[..., dict[str, Any]]:
+    """Cria uma dependencia FastAPI que exige pelo menos uma das roles informadas."""
     def dependency(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+        """Valida se o usuario autenticado possui alguma role exigida."""
         user_roles = set(user.get("roles", []))
         if not user_roles.intersection(required_roles):
             raise HTTPException(

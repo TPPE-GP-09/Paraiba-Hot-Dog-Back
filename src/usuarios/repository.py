@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from src.permissoes.model import Permissao
 from src.unidades.model import Unidade
+from src.keycloak_admin import create_keycloak_user, delete_keycloak_user, update_keycloak_user
 from src.usuarios.model import Usuario
 from src.usuarios.schema import UsuarioCreate, UsuarioUpdate
 
@@ -34,13 +35,24 @@ def _tratar_integridade(e: IntegrityError) -> HTTPException:
 def create_usuario(db: Session, data: UsuarioCreate) -> Usuario:
     permissoes = _resolver_permissoes(db, data.permissao_ids)
     _validar_unidade(db, data.unidade_id)
-    db_usuario = Usuario(**data.model_dump(exclude={"permissao_ids"}))
+    keycloak_id, keycloak_user_created = create_keycloak_user(
+        nome=data.nome,
+        email=str(data.email),
+        senha=data.senha,
+        nome_role=data.funcao.value,
+    )
+    db_usuario = Usuario(
+        **data.model_dump(exclude={"permissao_ids", "senha"}),
+        keycloak_id=keycloak_id,
+    )
     db_usuario.permissoes = permissoes
     db.add(db_usuario)
     try:
         db.commit()
     except IntegrityError as e:
         db.rollback()
+        if keycloak_user_created:
+            delete_keycloak_user(keycloak_id)
         raise _tratar_integridade(e) from e
     db.refresh(db_usuario)
     return db_usuario
@@ -69,6 +81,12 @@ def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario
         _validar_unidade(db, update_data["unidade_id"])
     if "permissao_ids" in update_data:
         usuario.permissoes = _resolver_permissoes(db, update_data.pop("permissao_ids"))
+    keycloak_update = {
+        "nome": update_data.get("nome"),
+        "email": str(update_data["email"]) if "email" in update_data else None,
+        "senha": update_data.pop("senha", None),
+        "nome_role": update_data["funcao"].value if "funcao" in update_data else None,
+    }
     for field, value in update_data.items():
         setattr(usuario, field, value)
     try:
@@ -77,10 +95,13 @@ def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario
         db.rollback()
         raise _tratar_integridade(e) from e
     db.refresh(usuario)
+    update_keycloak_user(usuario.keycloak_id, **keycloak_update)
     return usuario
 
 
 def delete_usuario(db: Session, usuario_id: int) -> None:
     usuario = get_usuario(db, usuario_id)
+    keycloak_id = usuario.keycloak_id
     db.delete(usuario)
     db.commit()
+    delete_keycloak_user(keycloak_id)

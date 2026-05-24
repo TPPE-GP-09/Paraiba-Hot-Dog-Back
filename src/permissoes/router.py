@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.permissoes import repository
-from src.usuarios.schema import PermissaoRead
+from src.permissoes.schema import PermissaoRead, PermissaoUpdate
 
 router = APIRouter()
 
@@ -21,6 +21,11 @@ def obter_permissao(permissao_id: int, db: Session = Depends(get_db)):
 @router.post("/{permissao_id}/conceder/{usuario_id}", response_model=PermissaoRead)
 def conceder_permissao(permissao_id: int, usuario_id: int, db: Session = Depends(get_db)):
     return repository.conceder_permissao(db, permissao_id, usuario_id)
+
+
+@router.patch("/{permissao_id}", response_model=PermissaoRead)
+def atualizar_permissao(permissao_id: int, data: PermissaoUpdate, db: Session = Depends(get_db)):
+    return repository.atualizar_permissao(db, permissao_id, data)
 
 
 @router.delete("/{permissao_id}/revogar/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT)
