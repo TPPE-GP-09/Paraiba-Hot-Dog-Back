@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.permissoes.model import Permissao, TipoPermissao
+from src.permissoes.schema import PermissaoUpdate
 from src.usuarios.model import Usuario
 
 
@@ -20,6 +21,18 @@ def obter_permissao(db: Session, permissao_id: int) -> Permissao:
 def criar_permissao(db: Session, nome: TipoPermissao) -> Permissao:
     permissao = Permissao(nome=nome)
     db.add(permissao)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Permissao ja cadastrada") from exc
+    db.refresh(permissao)
+    return permissao
+
+
+def atualizar_permissao(db: Session, permissao_id: int, data: PermissaoUpdate) -> Permissao:
+    permissao = obter_permissao(db, permissao_id)
+    permissao.nome = data.nome
     try:
         db.commit()
     except IntegrityError as exc:

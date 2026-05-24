@@ -102,6 +102,7 @@ def test_criar_usuario_com_unidade_valida(
     assert body["nome"] == payload["nome"]
     assert body["funcao"] == payload["funcao"]
     assert body["unidade_id"] == unidade_id
+    assert body["keycloak_id"]
 
 
 @pytest.mark.parametrize("unidade_id_invalida", [999999, 123456789])

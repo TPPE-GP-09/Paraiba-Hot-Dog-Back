@@ -29,13 +29,11 @@ app.include_router(
     produtos_router,
     prefix="/produtos",
     tags=["produtos"],
-    dependencies=auth_dependencies,
 )
 app.include_router(
     unidades_router,
     prefix="/unidades",
     tags=["unidades"],
-    dependencies=auth_dependencies,
 )
 app.include_router(
     permissoes_router,
@@ -47,7 +45,6 @@ app.include_router(
     blog_router,
     prefix="/blog",
     tags=["blog"],
-    dependencies=auth_dependencies,
 )
 app.include_router(
     pedidos_router,
