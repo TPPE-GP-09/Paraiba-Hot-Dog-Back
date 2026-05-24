@@ -24,7 +24,6 @@ jobs:
 
       - name: Start containers
         run: docker compose up -d --build
-
       - name: Wait for API health
         run: |
           for i in {1..30}; do
@@ -37,10 +36,13 @@ jobs:
           docker compose logs paraiba-hotdog-back
           exit 1
 
+      - name: Generate Keycloak token
+        run: echo "API_AUTH_TOKEN=$(scripts/keycloak-token.sh)" >> "$GITHUB_ENV"
+
       - name: Run pytest
         env:
           API_BASE_URL: http://127.0.0.1:8000
-        run: poetry run pytest src/ -v
+        run: poetry run pytest --cov=src --cov-report=term-missing -v
 
       - name: Stop containers
         if: always()

@@ -8,7 +8,7 @@ help:
 	@echo "  install        : Install dependencies with poetry"
 	@echo "  shell          : Enter poetry shell"
 	@echo "  run            : Run dev server (uvicorn)"
-	@echo "  test           : Run pytest"
+	@echo "  test           : Run pytest with coverage"
 	@echo "  pytest         : Run pytest with optional TEST variable: make pytest TEST=src/unidades/test_unidades.py"
 	@echo "  integration-test : Start Keycloak, generate token, and run integration tests"
 	@echo "  keycloak-up    : Start Keycloak with imported test realm"
@@ -34,7 +34,7 @@ run:
 	$(POETRY) run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 test:
-	$(POETRY) run pytest
+	$(POETRY) run pytest --cov=src --cov-report=term-missing -v
 
 pytest:
 	$(POETRY) run pytest $(TEST)

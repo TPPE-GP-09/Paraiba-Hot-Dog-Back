@@ -24,5 +24,12 @@ cryptography = "^48.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
+pytest-cov = "^5.0.0"
 httpx = "^0.25.0"
 pylint = "^4.0.5"
+
+[tool.coverage.run]
+omit = [
+    "src/**/test_*.py",
+    "src/conftest.py",
+]

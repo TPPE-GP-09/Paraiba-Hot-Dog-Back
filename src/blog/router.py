@@ -11,11 +11,13 @@ router = APIRouter()
 
 @router.get("/", response_model=list[BlogRead])
 def listar_posts(tipo: str | None = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Lista as postagens do blog com paginacao e filtro opcional por tipo."""
     return repository.listar_posts(db, tipo, skip, limit)
 
 
 @router.get("/{post_id}", response_model=BlogRead)
 def obter_post(post_id: int, db: Session = Depends(get_db)):
+    """Retorna uma postagem pelo ID."""
     return repository.obter_post(db, post_id)
 
 
@@ -26,6 +28,7 @@ def obter_post(post_id: int, db: Session = Depends(get_db)):
     dependencies=[Depends(get_current_user)],
 )
 def criar_post(data: BlogCreate, db: Session = Depends(get_db)):
+    """Cria uma nova postagem no blog. Requer autenticacao."""
     return repository.criar_post(db, data)
 
 
@@ -35,6 +38,7 @@ def criar_post(data: BlogCreate, db: Session = Depends(get_db)):
     dependencies=[Depends(get_current_user)],
 )
 def atualizar_post(post_id: int, data: BlogUpdate, db: Session = Depends(get_db)):
+    """Atualiza parcialmente uma postagem existente. Requer autenticacao."""
     return repository.atualizar_post(db, post_id, data)
 
 
@@ -44,5 +48,6 @@ def atualizar_post(post_id: int, data: BlogUpdate, db: Session = Depends(get_db)
     dependencies=[Depends(get_current_user)],
 )
 def excluir_post(post_id: int, db: Session = Depends(get_db)):
+    """Remove uma postagem do blog pelo ID. Requer autenticacao."""
     repository.excluir_post(db, post_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -9,6 +9,7 @@ class ClienteTelefoneMixin(BaseModel):
     @field_validator("telefone", mode="before", check_fields=False)
     @classmethod
     def sanitizar_telefone(cls, value: str | None) -> str | None:
+        """Remove todos os caracteres nao numericos do telefone antes da validacao."""
         if value is None:
             return value
         return re.sub(r"\D", "", str(value))

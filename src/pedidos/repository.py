@@ -34,6 +34,7 @@ VALOR_DESCONTO_FIDELIDADE = Decimal("17.00")
 
 
 def listar_pedidos(db: Session, filtro: PedidoFiltro) -> list[Pedido]:
+    """Lista os pedidos com filtros opcionais de unidade e status, ordenados do mais recente."""
     query = db.query(Pedido)
     if filtro.unidade_id is not None:
         query = query.filter(Pedido.unidade_id == filtro.unidade_id)
@@ -43,6 +44,7 @@ def listar_pedidos(db: Session, filtro: PedidoFiltro) -> list[Pedido]:
 
 
 def obter_pedido(db: Session, pedido_id: int) -> Pedido:
+    """Retorna um pedido pelo ID ou lanca 404 se nao encontrado."""
     pedido = db.get(Pedido, pedido_id)
     if not pedido:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido nao encontrado")
@@ -50,6 +52,7 @@ def obter_pedido(db: Session, pedido_id: int) -> Pedido:
 
 
 def obter_item(db: Session, item_id: int) -> ItemPedido:
+    """Retorna um item de pedido pelo ID ou lanca 404 se nao encontrado."""
     item = db.get(ItemPedido, item_id)
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item do pedido nao encontrado")
@@ -57,6 +60,7 @@ def obter_item(db: Session, item_id: int) -> ItemPedido:
 
 
 def _validar_pedido_aberto(pedido: Pedido) -> None:
+    """Lanca 400 se o pedido nao estiver com status 'aberto'."""
     if pedido.status != StatusPedido.aberto:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -65,6 +69,7 @@ def _validar_pedido_aberto(pedido: Pedido) -> None:
 
 
 def _validar_pedido_nao_cancelado(pedido: Pedido) -> None:
+    """Lanca 400 se o pedido estiver com status 'cancelado'."""
     if pedido.status == StatusPedido.cancelado:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -73,6 +78,7 @@ def _validar_pedido_nao_cancelado(pedido: Pedido) -> None:
 
 
 def _validar_cliente_unidade(db: Session, data: PedidoCreate) -> None:
+    """Valida existencia da unidade, do cliente e a disponibilidade de pontos de fidelidade."""
     if not db.get(Unidade, data.unidade_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unidade nao encontrada")
     cliente = db.get(Cliente, data.cliente_id) if data.cliente_id is not None else None
@@ -96,6 +102,7 @@ def _validar_variacao_disponivel(
     unidade_id: int,
     produto_variacao_id: int,
 ) -> ProdutoVariacao:
+    """Verifica se a variacao de produto existe, esta ativa e disponivel para a unidade informada."""
     variacao = db.get(ProdutoVariacao, produto_variacao_id)
     if not variacao:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variacao nao encontrada")
@@ -116,10 +123,12 @@ def _validar_variacao_disponivel(
 
 
 def _nome_variacao(variacao: ProdutoVariacao) -> str:
+    """Retorna o nome de exibicao de uma variacao de produto."""
     return variacao.nome
 
 
 def _obter_adicionais(db: Session, produto_id: int, adicional_ids: list[int]) -> list[ProdutoAdicional]:
+    """Busca e valida os adicionais de um produto pelos IDs fornecidos, lancando 400 se invalidos."""
     if not adicional_ids:
         return []
 
@@ -140,6 +149,7 @@ def _obter_adicionais(db: Session, produto_id: int, adicional_ids: list[int]) ->
 
 
 def _criar_item(pedido: Pedido, data: ItemPedidoCreate, lote: int, db: Session) -> ItemPedido:
+    """Cria e retorna um ItemPedido com seus adicionais a partir dos dados de criacao."""
     variacao = _validar_variacao_disponivel(db, pedido.unidade_id, data.produto_variacao_id)
     item = ItemPedido(
         pedido=pedido,
@@ -165,6 +175,7 @@ def _criar_item(pedido: Pedido, data: ItemPedidoCreate, lote: int, db: Session) 
 
 
 def _recalcular_totais(pedido: Pedido) -> None:
+    """Recalcula subtotal, desconto de fidelidade e total do pedido com base nos itens nao cancelados."""
     total = Decimal("0")
     for item in pedido.itens:
         if item.status == StatusItemPedido.cancelado:
@@ -178,6 +189,7 @@ def _recalcular_totais(pedido: Pedido) -> None:
 
 
 def criar_pedido(db: Session, data: PedidoCreate) -> Pedido:
+    """Cria um novo pedido com seus itens iniciais, aplicando desconto de fidelidade se solicitado."""
     _validar_cliente_unidade(db, data)
     pedido = Pedido(
         unidade_id=data.unidade_id,
@@ -196,6 +208,7 @@ def criar_pedido(db: Session, data: PedidoCreate) -> Pedido:
 
 
 def adicionar_itens(db: Session, pedido_id: int, data: AdicionarItensPedido) -> Pedido:
+    """Adiciona novos itens a um pedido aberto e recalcula os totais."""
     pedido = obter_pedido(db, pedido_id)
     _validar_pedido_aberto(pedido)
     proximo_lote = max((item.lote for item in pedido.itens), default=0) + 1
@@ -209,6 +222,7 @@ def adicionar_itens(db: Session, pedido_id: int, data: AdicionarItensPedido) -> 
 
 
 def _copiar_adicionais(item: ItemPedido) -> list[ItemPedidoAdicional]:
+    """Cria copias dos adicionais de um item para uso em um novo item de cancelamento parcial."""
     return [
         ItemPedidoAdicional(
             adicional_id=adicional.adicional_id,
@@ -220,6 +234,7 @@ def _copiar_adicionais(item: ItemPedido) -> list[ItemPedidoAdicional]:
 
 
 def cancelar_item(db: Session, item_id: int, data: CancelarItemPedido) -> Pedido:
+    """Cancela total ou parcialmente um item do pedido, registrando o motivo e recalculando totais."""
     item = obter_item(db, item_id)
     pedido = item.pedido
     _validar_pedido_aberto(pedido)
@@ -263,6 +278,7 @@ def cancelar_item(db: Session, item_id: int, data: CancelarItemPedido) -> Pedido
 
 
 def cancelar_pedido(db: Session, pedido_id: int, data: CancelarPedido) -> Pedido:
+    """Cancela um pedido aberto, marcando todos os itens pendentes como cancelados."""
     pedido = obter_pedido(db, pedido_id)
     _validar_pedido_aberto(pedido)
 
@@ -282,6 +298,7 @@ def cancelar_pedido(db: Session, pedido_id: int, data: CancelarPedido) -> Pedido
 
 
 def finalizar_pedido(db: Session, pedido_id: int, data: FinalizarPedido) -> Pedido:
+    """Fecha o pedido com a forma de pagamento informada, deduz e credita pontos de fidelidade."""
     pedido = obter_pedido(db, pedido_id)
     _validar_pedido_aberto(pedido)
     _recalcular_totais(pedido)
@@ -322,16 +339,19 @@ def finalizar_pedido(db: Session, pedido_id: int, data: FinalizarPedido) -> Pedi
 
 
 def _assinatura_adicionais(item: ItemPedido) -> tuple[int | None, ...]:
+    """Retorna uma tupla ordenada com os IDs dos adicionais do item para uso como chave de agrupamento."""
     return tuple(sorted(adicional.adicional_id for adicional in item.adicionais))
 
 
 def _status_grupo(itens: list[ItemPedido]) -> StatusItemPedido:
+    """Determina o status consolidado de um grupo de itens da cozinha."""
     if any(item.status == StatusItemPedido.preparando for item in itens):
         return StatusItemPedido.preparando
     return StatusItemPedido.aberto
 
 
 def listar_cozinha(db: Session, unidade_id: int | None = None) -> list[CozinhaItemRead]:
+    """Lista os itens pendentes de preparo agrupados por produto/lote para exibicao na cozinha."""
     query = (
         db.query(ItemPedido)
         .join(ItemPedido.pedido)
@@ -383,6 +403,7 @@ def listar_cozinha(db: Session, unidade_id: int | None = None) -> list[CozinhaIt
 
 
 def atualizar_status_cozinha(db: Session, data: AtualizarStatusCozinha) -> list[ItemPedido]:
+    """Atualiza o status de todos os itens de um lote de um pedido na cozinha."""
     if data.status not in {StatusItemPedido.preparando, StatusItemPedido.entregue}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

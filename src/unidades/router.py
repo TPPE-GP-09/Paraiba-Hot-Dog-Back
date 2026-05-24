@@ -11,11 +11,13 @@ router = APIRouter()
 
 @router.get("/", response_model=list[UnidadeRead])
 def listar_unidades(db: Session = Depends(get_db)):
+    """Lista todas as unidades cadastradas."""
     return repository.listar_unidades(db)
 
 
 @router.get("/{unidade_id}", response_model=UnidadeRead)
 def obter_unidade(unidade_id: int, db: Session = Depends(get_db)):
+    """Retorna os detalhes de uma unidade pelo ID."""
     return repository.obter_unidade(db, unidade_id)
 
 
@@ -26,6 +28,7 @@ def obter_unidade(unidade_id: int, db: Session = Depends(get_db)):
     dependencies=[Depends(get_current_user)],
 )
 def criar_unidade(data: UnidadeCreate, db: Session = Depends(get_db)):
+    """Cria uma nova unidade. Requer autenticacao."""
     return repository.criar_unidade(db, data)
 
 
@@ -35,6 +38,7 @@ def criar_unidade(data: UnidadeCreate, db: Session = Depends(get_db)):
     dependencies=[Depends(get_current_user)],
 )
 def atualizar_unidade(unidade_id: int, data: UnidadeUpdate, db: Session = Depends(get_db)):
+    """Atualiza parcialmente uma unidade existente. Requer autenticacao."""
     return repository.atualizar_unidade(db, unidade_id, data)
 
 
@@ -44,4 +48,5 @@ def atualizar_unidade(unidade_id: int, data: UnidadeUpdate, db: Session = Depend
     dependencies=[Depends(get_current_user)],
 )
 def excluir_unidade(unidade_id: int, db: Session = Depends(get_db)):
+    """Remove uma unidade pelo ID. Requer autenticacao."""
     repository.excluir_unidade(db, unidade_id)

@@ -8,6 +8,7 @@ load_dotenv()
 
 
 def _build_database_url() -> str:
+    """Constroi a URL de conexao com o banco de dados a partir das variaveis de ambiente."""
     database_url = getenv("DATABASE_URL")
     if database_url:
         return database_url
@@ -32,6 +33,7 @@ class Base(DeclarativeBase):
 
 
 def get_db():
+    """Dependencia FastAPI que fornece uma sessao de banco de dados e a fecha ao final da requisicao."""
     db: Session = SessionLocal()
     try:
         yield db

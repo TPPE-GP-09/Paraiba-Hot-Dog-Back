@@ -20,6 +20,7 @@ def criar_cliente(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> ClienteRead:
+    """Cadastra um novo cliente e agenda o envio de mensagem de boas-vindas via WhatsApp."""
     try:
         cliente = repository.criar_cliente(db, data)
     except IntegrityError as e:
@@ -39,12 +40,14 @@ def listar_clientes(
     filtro: ClienteFiltro = Depends(),
     db: Session = Depends(get_db),
 ) -> list[ClienteRead]:
+    """Lista os clientes ativos de acordo com os filtros informados."""
     clientes = repository.listar_clientes(db, filtro)
     return [ClienteRead.model_validate(c) for c in clientes]
 
 
 @router.get("/{cliente_id}", response_model=ClienteRead)
 def obter_cliente(cliente_id: int, db: Session = Depends(get_db)) -> ClienteRead:
+    """Retorna os dados de um cliente ativo pelo ID."""
     cliente = repository.obter_cliente(db, cliente_id)
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente nao encontrado")
@@ -53,6 +56,7 @@ def obter_cliente(cliente_id: int, db: Session = Depends(get_db)) -> ClienteRead
 
 @router.patch("/{cliente_id}", response_model=ClienteRead)
 def atualizar_cliente(cliente_id: int, data: ClienteUpdate, db: Session = Depends(get_db)) -> ClienteRead:
+    """Atualiza parcialmente os dados de um cliente existente."""
     try:
         cliente = repository.atualizar_cliente(db, cliente_id, data)
     except IntegrityError as e:
@@ -66,6 +70,7 @@ def atualizar_cliente(cliente_id: int, data: ClienteUpdate, db: Session = Depend
 
 @router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
 def excluir_cliente(cliente_id: int, db: Session = Depends(get_db)) -> Response:
+    """Realiza a exclusao logica de um cliente pelo ID."""
     deleted = repository.excluir_cliente(db, cliente_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Cliente nao encontrado")
