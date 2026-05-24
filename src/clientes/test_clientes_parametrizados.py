@@ -46,6 +46,7 @@ def override_get_db(db_session):
     """Substitui a dependencia get_db pela sessao de teste."""
 
     def _get_db():
+        """Fornece a sessao fake para o FastAPI durante o teste."""
         try:
             yield db_session
         finally:

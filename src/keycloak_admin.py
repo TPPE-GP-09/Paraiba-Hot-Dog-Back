@@ -18,6 +18,10 @@ def _request(
     form: dict[str, str] | None = None,
     expected_statuses: tuple[int, ...] = (200,),
 ) -> tuple[int, Any, dict[str, str]]:
+    """Executa uma requisicao HTTP generica ao Keycloak e retorna (status, body, headers).
+
+    Lanca HTTPException para status fora de expected_statuses ou em caso de falha de rede.
+    """
     headers: dict[str, str] = {}
     body: bytes | None = None
 
@@ -51,6 +55,7 @@ def _request(
 
 
 def _keycloak_exception(status_code: int) -> HTTPException:
+    """Mapeia um codigo de status HTTP do Keycloak para uma HTTPException adequada."""
     if status_code == 409:
         return HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -68,11 +73,13 @@ def _keycloak_exception(status_code: int) -> HTTPException:
 
 
 def _realm_admin_url(path: str) -> str:
+    """Constroi a URL completa para um endpoint da Admin API do realm configurado."""
     base_url = settings.keycloak_admin_base_url.rstrip("/")
     return f"{base_url}/admin/realms/{settings.keycloak_realm}/{path.lstrip('/')}"
 
 
 def _admin_token() -> str:
+    """Obtem um token de acesso administrativo do realm master do Keycloak."""
     base_url = settings.keycloak_admin_base_url.rstrip("/")
     _, body, _ = _request(
         "POST",
@@ -88,18 +95,21 @@ def _admin_token() -> str:
 
 
 def _first_id(items: Any) -> str | None:
+    """Retorna o campo 'id' do primeiro elemento de uma lista, ou None se vazia."""
     if isinstance(items, list) and items:
         return items[0].get("id")
     return None
 
 
 def _find_user_id(token: str, email: str) -> str | None:
+    """Busca no Keycloak o ID de um usuario pelo e-mail exato; retorna None se nao encontrado."""
     query = urlencode({"email": email, "exact": "true"})
     _, body, _ = _request("GET", _realm_admin_url(f"users?{query}"), token=token)
     return _first_id(body)
 
 
 def _ensure_realm_role(token: str, role_name: str) -> dict[str, Any]:
+    """Garante que a role de realm existe no Keycloak, criando-a se necessario, e a retorna."""
     role_status, role, _ = _request(
         "GET",
         _realm_admin_url(f"roles/{role_name}"),
@@ -121,6 +131,7 @@ def _ensure_realm_role(token: str, role_name: str) -> dict[str, Any]:
 
 
 def _reset_password(token: str, user_id: str, senha: str) -> None:
+    """Redefine a senha de um usuario no Keycloak de forma nao temporaria."""
     _request(
         "PUT",
         _realm_admin_url(f"users/{user_id}/reset-password"),
@@ -131,6 +142,7 @@ def _reset_password(token: str, user_id: str, senha: str) -> None:
 
 
 def _assign_realm_role(token: str, user_id: str, role_name: str) -> None:
+    """Atribui uma role de realm ao usuario informado, criando a role se necessario."""
     role = _ensure_realm_role(token, role_name)
     _request(
         "POST",
@@ -148,6 +160,11 @@ def create_keycloak_user(
     senha: str,
     nome_role: str,
 ) -> tuple[str | None, bool]:
+    """Cria ou localiza um usuario no Keycloak, define sua senha e atribui a role informada.
+
+    Retorna uma tupla (keycloak_id, criado), onde 'criado' indica se o usuario foi recem criado.
+    Retorna (None, False) se a sincronizacao com o Keycloak estiver desabilitada.
+    """
     if not settings.keycloak_user_sync_enabled:
         return None, False
 
@@ -195,6 +212,11 @@ def update_keycloak_user(
     senha: str | None = None,
     nome_role: str | None = None,
 ) -> None:
+    """Atualiza dados (nome, e-mail, senha e/ou role) de um usuario existente no Keycloak.
+
+    Campos passados como None sao ignorados. Nao faz nada se a sincronizacao estiver
+    desabilitada ou se user_id for None.
+    """
     if not settings.keycloak_user_sync_enabled or not user_id:
         return
 
@@ -223,6 +245,10 @@ def update_keycloak_user(
 
 
 def delete_keycloak_user(user_id: str | None) -> None:
+    """Remove um usuario do Keycloak pelo seu ID.
+
+    Nao faz nada se a sincronizacao estiver desabilitada ou se user_id for None.
+    """
     if not settings.keycloak_user_sync_enabled or not user_id:
         return
 

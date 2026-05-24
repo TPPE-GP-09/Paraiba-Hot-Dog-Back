@@ -12,6 +12,7 @@ pytestmark = pytest.mark.integration
 
 
 def _auth_headers() -> dict[str, str]:
+    """Retorna headers de autenticacao ou pula o teste sem token."""
     if not API_AUTH_TOKEN:
         pytest.skip("Defina API_AUTH_TOKEN para rodar os testes de integracao.")
     return {"Authorization": f"Bearer {API_AUTH_TOKEN}"}
@@ -19,6 +20,7 @@ def _auth_headers() -> dict[str, str]:
 
 @pytest.fixture(name="api_client")
 def fixture_api_client() -> httpx.Client:
+    """Cria um cliente HTTP autenticado para os testes de permissoes."""
     with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         try:
             health = client.get(f"{BASE_URL}/")
@@ -29,6 +31,7 @@ def fixture_api_client() -> httpx.Client:
 
 
 def test_atualizar_permissao_retorna_200(api_client: httpx.Client) -> None:
+    """Garante que uma permissao existente pode ser atualizada."""
     list_response = api_client.get(f"{BASE_URL}/permissoes/")
     assert list_response.status_code == 200, list_response.text
     permissao = list_response.json()[0]

@@ -56,4 +56,5 @@ app.include_router(
 
 @app.get("/")
 def read_root() -> dict[str, str]:
+    """Verifica se a API esta em execucao e retorna o status de saude."""
     return {"status": "ok"}

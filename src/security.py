@@ -23,7 +23,6 @@ def _auth_exception(detail: str = "Credenciais invalidas") -> HTTPException:
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-
 def _fetch_jwks() -> dict[str, Any]:
     """Busca e guarda em cache as chaves publicas JWKS publicadas pelo Keycloak."""
     now = monotonic()

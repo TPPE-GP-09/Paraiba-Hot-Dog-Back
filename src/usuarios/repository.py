@@ -10,6 +10,7 @@ from src.usuarios.schema import UsuarioCreate, UsuarioUpdate
 
 
 def _resolver_permissoes(db: Session, ids: list[int]) -> list[Permissao]:
+    """Busca permissoes pelos IDs informados, lancando 404 se alguma nao for encontrada."""
     permissoes = db.query(Permissao).filter(Permissao.id.in_(ids)).all()
     if len(permissoes) != len(ids):
         raise HTTPException(status_code=404, detail="Uma ou mais permissoes nao encontradas")
@@ -17,6 +18,7 @@ def _resolver_permissoes(db: Session, ids: list[int]) -> list[Permissao]:
 
 
 def _validar_unidade(db: Session, unidade_id: int | None) -> None:
+    """Valida se a unidade existe no banco, lancando 404 se nao encontrada. Ignora None."""
     if unidade_id is None:
         return
     if not db.get(Unidade, unidade_id):
@@ -24,6 +26,7 @@ def _validar_unidade(db: Session, unidade_id: int | None) -> None:
 
 
 def _tratar_integridade(e: IntegrityError) -> HTTPException:
+    """Mapeia um erro de integridade do banco para a HTTPException adequada."""
     erro = str(e.orig).lower()
     if "email" in erro:
         return HTTPException(status_code=409, detail="Email ja cadastrado")
@@ -33,6 +36,7 @@ def _tratar_integridade(e: IntegrityError) -> HTTPException:
 
 
 def create_usuario(db: Session, data: UsuarioCreate) -> Usuario:
+    """Cria um novo usuario no banco e o sincroniza com o Keycloak."""
     permissoes = _resolver_permissoes(db, data.permissao_ids)
     _validar_unidade(db, data.unidade_id)
     keycloak_id, keycloak_user_created = create_keycloak_user(
@@ -59,6 +63,7 @@ def create_usuario(db: Session, data: UsuarioCreate) -> Usuario:
 
 
 def list_usuarios(db: Session, email: str | None, nome: str | None) -> list[Usuario]:
+    """Lista usuarios com filtros opcionais de e-mail e nome, ordenados por ID."""
     query = db.query(Usuario)
     if email:
         query = query.filter(Usuario.email == email)
@@ -68,6 +73,7 @@ def list_usuarios(db: Session, email: str | None, nome: str | None) -> list[Usua
 
 
 def get_usuario(db: Session, usuario_id: int) -> Usuario:
+    """Retorna um usuario pelo ID ou lanca 404 se nao encontrado."""
     usuario = db.get(Usuario, usuario_id)
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario nao encontrado")
@@ -75,6 +81,7 @@ def get_usuario(db: Session, usuario_id: int) -> Usuario:
 
 
 def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario:
+    """Atualiza os campos fornecidos de um usuario e propaga as alteracoes ao Keycloak."""
     usuario = get_usuario(db, usuario_id)
     update_data = data.model_dump(exclude_unset=True)
     if "unidade_id" in update_data:
@@ -100,6 +107,7 @@ def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario
 
 
 def delete_usuario(db: Session, usuario_id: int) -> None:
+    """Remove um usuario do banco de dados e o exclui do Keycloak."""
     usuario = get_usuario(db, usuario_id)
     keycloak_id = usuario.keycloak_id
     db.delete(usuario)

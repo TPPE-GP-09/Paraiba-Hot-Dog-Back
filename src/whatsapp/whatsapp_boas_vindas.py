@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def _formatar_telefone_whatsapp(telefone: str) -> str:
+    """Formata um numero de telefone para o padrao internacional do WhatsApp com codigo do Brasil."""
     numeros = re.sub(r"\D", "", str(telefone or ""))
     if numeros.startswith("55"):
         return numeros
@@ -16,6 +17,7 @@ def _formatar_telefone_whatsapp(telefone: str) -> str:
 
 
 def _credenciais_configuradas() -> bool:
+    """Verifica se as credenciais do Twilio estao corretamente preenchidas nas configuracoes."""
     if not settings.twilio_account_sid or not settings.twilio_api_key_sid or not settings.twilio_auth_token:
         return False
     if settings.twilio_account_sid == "SEU_TWILIO_ACCOUNT_SID_AQUI":
@@ -32,6 +34,10 @@ def _credenciais_configuradas() -> bool:
 
 
 def enviar_boas_vindas(nome: str, telefone: str) -> dict:
+    """Envia mensagem de boas-vindas via WhatsApp ao cliente usando a API do Twilio.
+
+    Retorna um dict com o status do envio. Nao faz nada se as credenciais nao estiverem configuradas.
+    """
     logger.warning(
         "Iniciando envio de WhatsApp para cliente=%s telefone=%s",
         nome,

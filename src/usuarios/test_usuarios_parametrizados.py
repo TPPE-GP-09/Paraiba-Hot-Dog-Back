@@ -10,17 +10,20 @@ pytestmark = pytest.mark.integration
 
 
 def _unique_email(prefix: str) -> str:
+    """Gera um e-mail unico para testes de usuarios."""
     stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
     return f"{prefix}.{stamp}@example.com"
 
 
 def _auth_headers() -> dict[str, str]:
+    """Retorna headers de autenticacao ou pula o teste sem token."""
     if not API_AUTH_TOKEN:
         pytest.skip("Defina API_AUTH_TOKEN para rodar os testes de integracao.")
     return {"Authorization": f"Bearer {API_AUTH_TOKEN}"}
 
 
 def _create_unidade() -> int:
+    """Cria uma unidade real para vincular usuarios de integracao."""
     payload = {
         "nome": f"Unidade Teste {datetime.now(UTC).strftime('%H%M%S%f')}",
         "imagem": None,
@@ -45,6 +48,7 @@ def _create_unidade() -> int:
 
 @pytest.fixture(name="api_client")
 def fixture_api_client() -> httpx.Client:
+    """Cria um cliente HTTP autenticado para os testes de usuarios."""
     with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         try:
             health = client.get(f"{BASE_URL}/")
@@ -56,6 +60,7 @@ def fixture_api_client() -> httpx.Client:
 
 @pytest.fixture(name="cleanup_ids")
 def fixture_cleanup_ids():
+    """Remove usuarios e unidades criados durante o teste."""
     tracked = {"usuarios": [], "unidades": []}
     yield tracked
     if not API_AUTH_TOKEN:
@@ -81,6 +86,7 @@ def test_criar_usuario_com_unidade_valida(
     api_client: httpx.Client,
     cleanup_ids,
 ) -> None:
+    """Garante criacao de usuarios para funcoes validas."""
     unidade_id = _create_unidade()
     cleanup_ids["unidades"].append(unidade_id)
     payload = {
@@ -106,6 +112,7 @@ def test_criar_usuario_com_unidade_valida(
 
 @pytest.mark.parametrize("unidade_id_invalida", [999999, 123456789])
 def test_criar_usuario_com_unidade_inexistente_retorna_404(unidade_id_invalida: int, api_client: httpx.Client) -> None:
+    """Garante 404 ao criar usuario com unidade inexistente."""
     payload = {
         "nome": "Usuario Unidade Invalida",
         "email": _unique_email("usuario.invalido"),

@@ -15,6 +15,7 @@ pytestmark = pytest.mark.integration
 
 
 def _payload_unidade(**overrides):
+    """Monta um payload unico de unidade para testes de integracao."""
     stamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S%f")
     payload = {
         "nome": f"Unidade Integracao {stamp}",
@@ -37,6 +38,7 @@ def _payload_unidade(**overrides):
 
 
 def _auth_headers() -> dict[str, str]:
+    """Retorna headers de autenticacao ou pula o teste sem token."""
     if not API_AUTH_TOKEN:
         pytest.skip("Defina API_AUTH_TOKEN para rodar os testes de integracao.")
     return {"Authorization": f"Bearer {API_AUTH_TOKEN}"}
@@ -44,6 +46,7 @@ def _auth_headers() -> dict[str, str]:
 
 @pytest.fixture(name="api_client")
 def fixture_api_client() -> httpx.Client:
+    """Cria um cliente HTTP autenticado para os testes de unidades."""
     with httpx.Client(timeout=10.0, headers=_auth_headers()) as client:
         try:
             health = client.get(f"{BASE_URL}/")
@@ -55,6 +58,7 @@ def fixture_api_client() -> httpx.Client:
 
 @pytest.fixture(name="cleanup_ids")
 def fixture_cleanup_ids():
+    """Remove unidades criadas durante o teste ao final da execucao."""
     tracked = []
     yield tracked
     if not API_AUTH_TOKEN:
@@ -65,6 +69,7 @@ def fixture_cleanup_ids():
 
 
 def test_criar_e_obter_unidade(api_client: httpx.Client, cleanup_ids) -> None:
+    """Garante criacao e busca de unidade pela API real."""
     payload = _payload_unidade()
 
     create_response = api_client.post(f"{BASE_URL}/unidades/", json=payload)
@@ -82,6 +87,7 @@ def test_criar_e_obter_unidade(api_client: httpx.Client, cleanup_ids) -> None:
 
 
 def test_listar_unidades_retorna_200(api_client: httpx.Client) -> None:
+    """Garante que a listagem de unidades responde com sucesso."""
     response = api_client.get(f"{BASE_URL}/unidades/")
 
     assert response.status_code == 200, response.text
@@ -89,6 +95,7 @@ def test_listar_unidades_retorna_200(api_client: httpx.Client) -> None:
 
 
 def test_obter_unidade_inexistente_retorna_404(api_client: httpx.Client) -> None:
+    """Garante 404 ao buscar unidade inexistente."""
     response = api_client.get(f"{BASE_URL}/unidades/999999999")
 
     assert response.status_code == 404, response.text
@@ -96,6 +103,7 @@ def test_obter_unidade_inexistente_retorna_404(api_client: httpx.Client) -> None
 
 
 def test_atualizar_unidade_altera_dados_e_endereco(api_client: httpx.Client, cleanup_ids) -> None:
+    """Garante atualizacao dos dados e endereco da unidade."""
     create_response = api_client.post(f"{BASE_URL}/unidades/", json=_payload_unidade())
     assert create_response.status_code == 201, create_response.text
     unidade_id = create_response.json()["id"]
@@ -123,6 +131,7 @@ def test_deletar_unidade_remove_e_get_retorna_404(
     api_client: httpx.Client,
     cleanup_ids,
 ) -> None:
+    """Garante remocao de unidade e 404 na busca posterior."""
     create_response = api_client.post(f"{BASE_URL}/unidades/", json=_payload_unidade())
     assert create_response.status_code == 201, create_response.text
     unidade_id = create_response.json()["id"]

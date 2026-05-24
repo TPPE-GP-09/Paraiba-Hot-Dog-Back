@@ -36,6 +36,7 @@ TestingSessionLocal = sessionmaker(
 
 @pytest.fixture(scope="function")
 def db_session():
+    """Cria uma sessao SQLite isolada para cada teste de pedidos."""
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
     try:
@@ -47,7 +48,9 @@ def db_session():
 
 @pytest.fixture(autouse=True)
 def override_get_db(db_session):
+    """Substitui a dependencia get_db pela sessao de teste."""
     def _get_db():
+        """Fornece a sessao fake para o FastAPI durante o teste."""
         try:
             yield db_session
         finally:
@@ -60,11 +63,13 @@ def override_get_db(db_session):
 
 @pytest.fixture(name="cliente")
 def fixture_cliente():
+    """Cria o TestClient usado nos cenarios de pedidos."""
     return TestClient(app)
 
 
 @pytest.fixture
 def cardapio_base(db_session):
+    """Cria unidade, produto, variacao, adicionais e cliente base."""
     endereco = Endereco(
         cep="71900000",
         logradouro="Aguas Claras",
@@ -140,6 +145,7 @@ def cardapio_base(db_session):
 
 @pytest.mark.integration
 def test_criar_pagar_e_manter_item_na_cozinha(cliente, cardapio_base):
+    """Garante criacao, pagamento e exibicao do item na cozinha."""
     payload = {
         "unidade_id": cardapio_base["unidade"].id,
         "nome_comanda": "Daniel",
@@ -189,6 +195,7 @@ def test_criar_pagar_e_manter_item_na_cozinha(cliente, cardapio_base):
 
 @pytest.mark.integration
 def test_resgate_fidelidade_aplica_desconto_e_debita_pontos_no_pagamento(cliente, cardapio_base):
+    """Garante aplicacao e baixa de pontos no desconto fidelidade."""
     cardapio_base["cliente"].pontos_fidelidade = 12
 
     resposta_pedido = cliente.post(
@@ -228,6 +235,7 @@ def test_resgate_fidelidade_aplica_desconto_e_debita_pontos_no_pagamento(cliente
 
 @pytest.mark.integration
 def test_status_cozinha_atualiza_todos_os_itens_do_lote(cliente, cardapio_base):
+    """Garante atualizacao em lote do status dos itens da cozinha."""
     resposta_pedido = cliente.post(
         "/pedidos/",
         json={
@@ -269,6 +277,7 @@ def test_status_cozinha_atualiza_todos_os_itens_do_lote(cliente, cardapio_base):
 
 @pytest.mark.integration
 def test_cancelamento_parcial_divide_item(cliente, cardapio_base):
+    """Garante que cancelamento parcial divide o item do pedido."""
     resposta_pedido = cliente.post(
         "/pedidos/",
         json={

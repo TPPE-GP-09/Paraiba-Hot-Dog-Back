@@ -6,6 +6,7 @@ from src.clientes.schema import ClienteCreate, ClienteFiltro, ClienteUpdate
 
 
 def _mapear_erro_integridade(error: IntegrityError) -> str:
+    """Traduz um erro de integridade do banco para uma mensagem legivel ao usuario."""
     message = str(error.orig)
     if "telefone" in message:
         return "Telefone ja cadastrado"
@@ -15,6 +16,7 @@ def _mapear_erro_integridade(error: IntegrityError) -> str:
 
 
 def listar_clientes(db: Session, filtro: ClienteFiltro) -> list[Cliente]:
+    """Lista os clientes ativos aplicando os filtros de telefone, nome e email fornecidos."""
     query = db.query(Cliente).filter(Cliente.ativo.is_(True))
     if filtro.telefone:
         query = query.filter(Cliente.telefone == filtro.telefone)
@@ -26,6 +28,7 @@ def listar_clientes(db: Session, filtro: ClienteFiltro) -> list[Cliente]:
 
 
 def obter_cliente(db: Session, cliente_id: int) -> Cliente | None:
+    """Retorna o cliente ativo pelo ID, ou None se nao encontrado."""
     return (
         db.query(Cliente)
         .filter(Cliente.id == cliente_id, Cliente.ativo.is_(True))
@@ -34,6 +37,7 @@ def obter_cliente(db: Session, cliente_id: int) -> Cliente | None:
 
 
 def criar_cliente(db: Session, data: ClienteCreate) -> Cliente:
+    """Persiste um novo cliente no banco de dados e o retorna."""
     cliente = Cliente(**data.model_dump())
     db.add(cliente)
     db.commit()
@@ -42,6 +46,7 @@ def criar_cliente(db: Session, data: ClienteCreate) -> Cliente:
 
 
 def atualizar_cliente(db: Session, cliente_id: int, data: ClienteUpdate) -> Cliente | None:
+    """Atualiza os campos fornecidos do cliente e o retorna, ou None se nao encontrado."""
     cliente = obter_cliente(db, cliente_id)
     if not cliente:
         return None
@@ -53,6 +58,7 @@ def atualizar_cliente(db: Session, cliente_id: int, data: ClienteUpdate) -> Clie
 
 
 def excluir_cliente(db: Session, cliente_id: int) -> bool:
+    """Desativa (soft delete) um cliente pelo ID. Retorna True se encontrado, False caso contrario."""
     cliente = obter_cliente(db, cliente_id)
     if not cliente:
         return False

@@ -37,6 +37,7 @@ def override_get_db(db_session):
     """Substitui automaticamente a dependencia get_db do FastAPI pela sessao de teste."""
 
     def _get_db():
+        """Fornece a sessao fake para o FastAPI durante o teste."""
         try:
             yield db_session
         finally:
@@ -55,6 +56,7 @@ def fixture_cliente():
 
 @pytest.fixture
 def dados_base(cliente):
+    """Cria categoria, subcategoria e produto base para os testes."""
     resposta_categoria = cliente.post(
         "/produtos/categorias", json={"nome": "Hot-Dog"})
     assert resposta_categoria.status_code == 201
@@ -133,6 +135,7 @@ def dados_base(cliente):
     ],
 )
 def test_criar_itens(cliente, dados_base, rota, dados_requisicao, status_esperado):
+    """Garante criacao e validacao de variacoes e adicionais."""
     # Injeta ID do produto para manter a integridade referencial.
     if "produto_id" not in dados_requisicao:
         dados_requisicao["produto_id"] = dados_base["produto"]["id"]
@@ -156,6 +159,7 @@ def test_criar_itens(cliente, dados_base, rota, dados_requisicao, status_esperad
     ],
 )
 def test_ler_itens(cliente, dados_base, rota, status_esperado):
+    """Garante leitura de endpoints de produtos e itens relacionados."""
     if "{produto_id}" in rota:
         rota = rota.format(produto_id=dados_base["produto"]["id"])
 

@@ -26,10 +26,12 @@ from src.unidades.model import Unidade
 
 
 def listar_categorias(db: Session) -> list[Categoria]:
+    """Retorna todas as categorias cadastradas."""
     return db.query(Categoria).all()
 
 
 def criar_categoria(db: Session, data: CategoriaCreate) -> Categoria:
+    """Cria uma nova categoria de produto no banco de dados."""
     obj = Categoria(**data.model_dump())
 
     try:
@@ -49,6 +51,7 @@ def criar_categoria(db: Session, data: CategoriaCreate) -> Categoria:
 
 
 def obter_categoria(db: Session, categoria_id: int) -> Categoria:
+    """Retorna uma categoria pelo ID ou lanca 404 se nao encontrada."""
     categoria = db.get(Categoria, categoria_id)
     if not categoria:
         raise HTTPException(
@@ -63,6 +66,7 @@ def atualizar_categoria(
     categoria_id: int,
     data: CategoriaUpdate,
 ) -> Categoria:
+    """Atualiza os campos fornecidos de uma categoria existente."""
     categoria = obter_categoria(db, categoria_id)
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(categoria, key, value)
@@ -81,6 +85,7 @@ def atualizar_categoria(
 
 
 def excluir_categoria(db: Session, categoria_id: int) -> None:
+    """Remove uma categoria, lancando 409 se houver subcategorias vinculadas."""
     categoria = obter_categoria(db, categoria_id)
     if categoria.subcategorias:
         raise HTTPException(
@@ -100,10 +105,12 @@ def excluir_categoria(db: Session, categoria_id: int) -> None:
 
 
 def listar_subcategorias(db: Session) -> list[Subcategoria]:
+    """Retorna todas as subcategorias cadastradas."""
     return db.query(Subcategoria).all()
 
 
 def criar_subcategoria(db: Session, data: SubcategoriaCreate) -> Subcategoria:
+    """Cria uma nova subcategoria vinculada a uma categoria existente."""
     categoria = db.get(Categoria, data.categoria_id)
 
     if not categoria:
@@ -131,6 +138,7 @@ def criar_subcategoria(db: Session, data: SubcategoriaCreate) -> Subcategoria:
 
 
 def obter_subcategoria(db: Session, subcategoria_id: int) -> Subcategoria:
+    """Retorna uma subcategoria pelo ID ou lanca 404 se nao encontrada."""
     subcategoria = db.get(Subcategoria, subcategoria_id)
     if not subcategoria:
         raise HTTPException(
@@ -145,6 +153,7 @@ def atualizar_subcategoria(
     subcategoria_id: int,
     data: SubcategoriaUpdate,
 ) -> Subcategoria:
+    """Atualiza os campos fornecidos de uma subcategoria existente."""
     subcategoria = obter_subcategoria(db, subcategoria_id)
 
     if data.categoria_id is not None and not db.get(Categoria, data.categoria_id):
@@ -170,6 +179,7 @@ def atualizar_subcategoria(
 
 
 def excluir_subcategoria(db: Session, subcategoria_id: int) -> None:
+    """Remove uma subcategoria, lancando 409 se houver produtos vinculados."""
     subcategoria = obter_subcategoria(db, subcategoria_id)
     if subcategoria.produtos:
         raise HTTPException(
@@ -194,6 +204,7 @@ def listar_produtos(
     limit: int,
     unidade_id: int | None = None,
 ) -> list[Produto]:
+    """Lista produtos com paginacao e filtro opcional por unidade disponivel."""
     query = db.query(Produto)
     if unidade_id is not None:
         query = query.filter(
@@ -206,6 +217,7 @@ def listar_produtos(
 
 
 def obter_produto(db: Session, produto_id: int) -> Produto:
+    """Retorna um produto pelo ID ou lanca 404 se nao encontrado."""
     produto = db.query(Produto).filter(Produto.id == produto_id).first()
 
     if produto is None:
@@ -218,6 +230,7 @@ def obter_produto(db: Session, produto_id: int) -> Produto:
 
 
 def _obter_unidades(db: Session, unidade_ids: list[int]) -> list[Unidade]:
+    """Busca unidades pelos IDs fornecidos, lancando 404 se alguma nao for encontrada."""
     unidades = db.query(Unidade).filter(Unidade.id.in_(unidade_ids)).all()
     if len(unidades) != len(set(unidade_ids)):
         raise HTTPException(
@@ -233,6 +246,7 @@ def _aplicar_disponibilidade(
     disponivel_todas_unidades: bool,
     unidade_ids: list[int],
 ) -> None:
+    """Define a disponibilidade do produto por unidade, validando e associando as unidades informadas."""
     produto.disponivel_todas_unidades = disponivel_todas_unidades
     if disponivel_todas_unidades:
         produto.unidades = []
@@ -248,6 +262,7 @@ def _aplicar_disponibilidade(
 
 
 def criar_produto(db: Session, data: ProdutoCreate) -> Produto:
+    """Cria um novo produto vinculado a uma subcategoria e define sua disponibilidade por unidade."""
     subcategoria = db.get(Subcategoria, data.subcategoria_id)
 
     if not subcategoria:
@@ -286,6 +301,7 @@ def atualizar_produto(
     produto_id: int,
     data: ProdutoUpdate,
 ) -> Produto:
+    """Atualiza os campos fornecidos de um produto, incluindo sua disponibilidade por unidade."""
     db_produto = obter_produto(db, produto_id)
 
     if data.subcategoria_id is not None:
@@ -326,6 +342,7 @@ def atualizar_produto(
 
 
 def excluir_produto(db: Session, produto_id: int) -> None:
+    """Remove permanentemente um produto do banco de dados."""
     db_produto = obter_produto(db, produto_id)
 
     try:
@@ -342,6 +359,7 @@ def excluir_produto(db: Session, produto_id: int) -> None:
 
 
 def listar_variacoes(db: Session) -> list[ProdutoVariacao]:
+    """Retorna todas as variacoes de produto cadastradas."""
     return db.query(ProdutoVariacao).all()
 
 
@@ -349,6 +367,7 @@ def obter_variacao(
     db: Session,
     variacao_id: int,
 ) -> ProdutoVariacao:
+    """Retorna uma variacao de produto pelo ID ou lanca 404 se nao encontrada."""
     variacao = (
         db.query(ProdutoVariacao)
         .filter(ProdutoVariacao.id == variacao_id)
@@ -368,6 +387,7 @@ def criar_variacao(
     db: Session,
     data: ProdutoVariacaoCreate,
 ) -> ProdutoVariacao:
+    """Cria uma nova variacao para um produto existente."""
     produto = db.get(Produto, data.produto_id)
 
     if not produto:
@@ -399,6 +419,7 @@ def atualizar_variacao(
     variacao_id: int,
     data: ProdutoVariacaoUpdate,
 ) -> ProdutoVariacao:
+    """Atualiza os campos fornecidos de uma variacao de produto existente."""
     variacao = obter_variacao(db, variacao_id)
 
     for key, value in data.model_dump(exclude_unset=True).items():
@@ -423,6 +444,7 @@ def excluir_variacao(
     db: Session,
     variacao_id: int,
 ) -> None:
+    """Remove permanentemente uma variacao de produto do banco de dados."""
     variacao = obter_variacao(db, variacao_id)
 
     try:
@@ -441,6 +463,7 @@ def excluir_variacao(
 def listar_adicionais(
     db: Session,
 ) -> list[ProdutoAdicional]:
+    """Retorna todos os adicionais de produto cadastrados."""
     return db.query(ProdutoAdicional).all()
 
 
@@ -448,6 +471,7 @@ def obter_adicional(
     db: Session,
     adicional_id: int,
 ) -> ProdutoAdicional:
+    """Retorna um adicional de produto pelo ID ou lanca 404 se nao encontrado."""
     adicional = (
         db.query(ProdutoAdicional)
         .filter(ProdutoAdicional.id == adicional_id)
@@ -467,6 +491,7 @@ def criar_adicional(
     db: Session,
     data: ProdutoAdicionalCreate,
 ) -> ProdutoAdicional:
+    """Cria um novo adicional vinculado a um produto existente."""
     produto = db.get(Produto, data.produto_id)
 
     if not produto:
@@ -498,6 +523,7 @@ def atualizar_adicional(
     adicional_id: int,
     data: ProdutoAdicionalUpdate,
 ) -> ProdutoAdicional:
+    """Atualiza os campos fornecidos de um adicional de produto existente."""
     adicional = obter_adicional(
         db,
         adicional_id,
@@ -525,6 +551,7 @@ def excluir_adicional(
     db: Session,
     adicional_id: int,
 ) -> None:
+    """Remove permanentemente um adicional de produto do banco de dados."""
     adicional = obter_adicional(
         db,
         adicional_id,

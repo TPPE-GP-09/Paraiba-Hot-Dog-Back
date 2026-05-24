@@ -31,6 +31,7 @@ router = APIRouter()
 def listar_categorias(
     db: Session = Depends(get_db),
 ) -> list[CategoriaRead]:
+    """Lista todas as categorias de produto."""
     return repository.listar_categorias(db)
 
 
@@ -44,6 +45,7 @@ def criar_categoria(
     data: CategoriaCreate,
     db: Session = Depends(get_db),
 ) -> CategoriaRead:
+    """Cria uma nova categoria de produto. Requer autenticacao."""
     return repository.criar_categoria(db, data)
 
 
@@ -56,6 +58,7 @@ def atualizar_categoria(
     data: CategoriaUpdate,
     db: Session = Depends(get_db),
 ) -> CategoriaRead:
+    """Atualiza parcialmente uma categoria de produto existente."""
     return repository.atualizar_categoria(db, categoria_id, data)
 
 
@@ -67,6 +70,7 @@ def excluir_categoria(
     categoria_id: int,
     db: Session = Depends(get_db),
 ) -> None:
+    """Remove uma categoria de produto pelo ID."""
     repository.excluir_categoria(db, categoria_id)
 
 @router.get(
@@ -76,6 +80,7 @@ def excluir_categoria(
 def listar_subcategorias(
     db: Session = Depends(get_db),
 ) -> list[SubcategoriaRead]:
+    """Lista todas as subcategorias de produto."""
     return repository.listar_subcategorias(db)
 
 
@@ -89,6 +94,7 @@ def criar_subcategoria(
     data: SubcategoriaCreate,
     db: Session = Depends(get_db),
 ) -> SubcategoriaRead:
+    """Cria uma nova subcategoria vinculada a uma categoria existente. Requer autenticacao."""
     return repository.criar_subcategoria(db, data)
 
 
@@ -101,6 +107,7 @@ def atualizar_subcategoria(
     data: SubcategoriaUpdate,
     db: Session = Depends(get_db),
 ) -> SubcategoriaRead:
+    """Atualiza parcialmente uma subcategoria existente."""
     return repository.atualizar_subcategoria(db, subcategoria_id, data)
 
 
@@ -112,6 +119,7 @@ def excluir_subcategoria(
     subcategoria_id: int,
     db: Session = Depends(get_db),
 ) -> None:
+    """Remove uma subcategoria de produto pelo ID."""
     repository.excluir_subcategoria(db, subcategoria_id)
 
 
@@ -122,6 +130,7 @@ def excluir_subcategoria(
 def listar_variacoes(
     db: Session = Depends(get_db),
 ) -> list[ProdutoVariacaoRead]:
+    """Lista todas as variacoes de produto."""
     return repository.listar_variacoes(db)
 
 
@@ -135,6 +144,7 @@ def criar_variacao(
     data: ProdutoVariacaoCreate,
     db: Session = Depends(get_db),
 ) -> ProdutoVariacaoRead:
+    """Cria uma nova variacao para um produto existente. Requer autenticacao."""
     return repository.criar_variacao(db, data)
 
 
@@ -148,6 +158,7 @@ def atualizar_variacao(
     data: ProdutoVariacaoUpdate,
     db: Session = Depends(get_db),
 ) -> ProdutoVariacaoRead:
+    """Atualiza parcialmente uma variacao de produto existente. Requer autenticacao."""
     return repository.atualizar_variacao(
         db,
         variacao_id,
@@ -164,6 +175,7 @@ def excluir_variacao(
     variacao_id: int,
     db: Session = Depends(get_db),
 ) -> None:
+    """Remove uma variacao de produto pelo ID. Requer autenticacao."""
     repository.excluir_variacao(
         db,
         variacao_id,
@@ -177,6 +189,7 @@ def excluir_variacao(
 def listar_adicionais(
     db: Session = Depends(get_db),
 ) -> list[ProdutoAdicionalRead]:
+    """Lista todos os adicionais de produto."""
     return repository.listar_adicionais(db)
 
 
@@ -190,6 +203,7 @@ def criar_adicional(
     data: ProdutoAdicionalCreate,
     db: Session = Depends(get_db),
 ) -> ProdutoAdicionalRead:
+    """Cria um novo adicional vinculado a um produto. Requer autenticacao."""
     return repository.criar_adicional(db, data)
 
 
@@ -203,6 +217,7 @@ def atualizar_adicional(
     data: ProdutoAdicionalUpdate,
     db: Session = Depends(get_db),
 ) -> ProdutoAdicionalRead:
+    """Atualiza parcialmente um adicional de produto existente. Requer autenticacao."""
     return repository.atualizar_adicional(
         db,
         adicional_id,
@@ -219,6 +234,7 @@ def excluir_adicional(
     adicional_id: int,
     db: Session = Depends(get_db),
 ) -> None:
+    """Remove um adicional de produto pelo ID. Requer autenticacao."""
     repository.excluir_adicional(
         db,
         adicional_id,
@@ -235,6 +251,7 @@ def listar_produtos(
     unidade_id: int | None = Query(None, gt=0),
     db: Session = Depends(get_db),
 ) -> list[ProdutoRead]:
+    """Lista produtos com paginacao e filtro opcional por unidade."""
     return repository.listar_produtos(db, skip, limit, unidade_id)
 
 
@@ -246,6 +263,7 @@ def obter_produto(
     produto_id: int,
     db: Session = Depends(get_db),
 ) -> ProdutoRead:
+    """Retorna os detalhes de um produto pelo ID."""
     return repository.obter_produto(db, produto_id)
 
 
@@ -259,6 +277,7 @@ def criar_produto(
     produto: ProdutoCreate,
     db: Session = Depends(get_db),
 ) -> ProdutoRead:
+    """Cria um novo produto. Requer autenticacao."""
     return repository.criar_produto(db, produto)
 
 
@@ -272,6 +291,7 @@ def atualizar_produto(
     data: ProdutoUpdate,
     db: Session = Depends(get_db),
 ) -> ProdutoRead:
+    """Atualiza parcialmente um produto existente. Requer autenticacao."""
     return repository.atualizar_produto(
         db,
         produto_id,
@@ -288,4 +308,5 @@ def excluir_produto(
     produto_id: int,
     db: Session = Depends(get_db),
 ) -> None:
+    """Remove um produto pelo ID. Requer autenticacao."""
     repository.excluir_produto(db, produto_id)

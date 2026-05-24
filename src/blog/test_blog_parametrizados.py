@@ -30,6 +30,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 @pytest.fixture(scope="function")
 def db_session():
+    """Cria uma sessao SQLite isolada para cada teste de blog."""
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
     try:
@@ -41,7 +42,9 @@ def db_session():
 
 @pytest.fixture
 def override_get_db(db_session):
+    """Substitui a dependencia get_db pela sessao de teste."""
     def _get_db():
+        """Fornece a sessao fake para o FastAPI durante o teste."""
         try:
             yield db_session
         finally:
@@ -54,6 +57,7 @@ def override_get_db(db_session):
 
 @pytest.fixture
 def authenticated_user():
+    """Simula um usuario autenticado para rotas protegidas."""
     app.dependency_overrides[get_current_user] = lambda: {
         "sub": "test-user",
         "roles": ["administrador"],
@@ -64,6 +68,7 @@ def authenticated_user():
 
 @pytest.fixture
 def unauthenticated_user():
+    """Remove o usuario autenticado para testar acesso negado."""
     app.dependency_overrides.pop(get_current_user, None)
     yield
     app.dependency_overrides.pop(get_current_user, None)
@@ -71,6 +76,7 @@ def unauthenticated_user():
 
 @pytest.fixture
 def post_valido(db_session):
+    """Cria um post valido para os cenarios parametrizados."""
     post = Blog(
         titulo="Nova Unidade Abre",
         imagem_url="https://example.com/post.jpg",
@@ -86,6 +92,7 @@ def post_valido(db_session):
 
 @pytest.mark.parametrize("tipo", ["noticia", "promocao"])
 def test_criar_post(override_get_db, authenticated_user, tipo):
+    """Garante criacao de post para cada tipo permitido."""
     payload = {
         "titulo": f"Post {tipo}",
         "imagem_url": "https://example.com/promo.jpg",
@@ -108,12 +115,14 @@ def test_criar_post(override_get_db, authenticated_user, tipo):
     ],
 )
 def test_criar_invalido_retorna_422(override_get_db, authenticated_user, payload):
+    """Garante erro de validacao para payloads invalidos."""
     response = client.post("/blog/", json=payload)
     assert response.status_code == 422
 
 
 @pytest.mark.parametrize("metodo", ["post", "patch", "delete"])
 def test_rotas_protegidas_sem_token_retorna_401(override_get_db, unauthenticated_user, post_valido, metodo):
+    """Garante 401 nas rotas protegidas sem usuario autenticado."""
     if metodo == "post":
         payload = {
             "titulo": "Promoção de Verão",

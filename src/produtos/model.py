@@ -146,6 +146,7 @@ class Produto(Base):
 
     @property
     def unidade_ids(self) -> list[int]:
+        """Retorna a lista de IDs das unidades onde o produto esta disponivel."""
         return [unidade.id for unidade in self.unidades]
 
 

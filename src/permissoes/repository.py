@@ -8,10 +8,12 @@ from src.usuarios.model import Usuario
 
 
 def listar_permissoes(db: Session) -> list[Permissao]:
+    """Retorna todas as permissoes cadastradas no sistema."""
     return db.query(Permissao).all()
 
 
 def obter_permissao(db: Session, permissao_id: int) -> Permissao:
+    """Retorna uma permissao pelo ID ou lanca 404 se nao encontrada."""
     permissao = db.get(Permissao, permissao_id)
     if not permissao:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Permissao nao encontrada")
@@ -19,6 +21,7 @@ def obter_permissao(db: Session, permissao_id: int) -> Permissao:
 
 
 def criar_permissao(db: Session, nome: TipoPermissao) -> Permissao:
+    """Cria uma nova permissao no banco de dados, lancando 409 se ja existir."""
     permissao = Permissao(nome=nome)
     db.add(permissao)
     try:
@@ -31,6 +34,7 @@ def criar_permissao(db: Session, nome: TipoPermissao) -> Permissao:
 
 
 def atualizar_permissao(db: Session, permissao_id: int, data: PermissaoUpdate) -> Permissao:
+    """Atualiza o nome de uma permissao existente."""
     permissao = obter_permissao(db, permissao_id)
     permissao.nome = data.nome
     try:
@@ -43,12 +47,14 @@ def atualizar_permissao(db: Session, permissao_id: int, data: PermissaoUpdate) -
 
 
 def excluir_permissao(db: Session, permissao_id: int) -> None:
+    """Remove permanentemente uma permissao do banco de dados."""
     permissao = obter_permissao(db, permissao_id)
     db.delete(permissao)
     db.commit()
 
 
 def conceder_permissao(db: Session, permissao_id: int, usuario_id: int) -> Permissao:
+    """Associa uma permissao a um usuario, lancando 409 se ele ja a possuir."""
     permissao = obter_permissao(db, permissao_id)
     usuario = db.get(Usuario, usuario_id)
     if not usuario:
@@ -62,6 +68,7 @@ def conceder_permissao(db: Session, permissao_id: int, usuario_id: int) -> Permi
 
 
 def revogar_permissao(db: Session, permissao_id: int, usuario_id: int) -> None:
+    """Remove a associacao de uma permissao de um usuario, lancando 404 se ele nao a possuir."""
     permissao = obter_permissao(db, permissao_id)
     usuario = db.get(Usuario, usuario_id)
     if not usuario:

@@ -43,6 +43,7 @@ def override_get_db(db_session):
     """Substitui a dependencia get_db pela sessao de teste."""
 
     def _get_db():
+        """Fornece a sessao fake para o FastAPI durante o teste."""
         try:
             yield db_session
         finally:
@@ -89,6 +90,7 @@ def unidade_valida(db_session, endereco_valido):
 
 
 def _payload_unidade(**overrides):
+    """Monta um payload base de unidade para os testes."""
     payload = {
         "nome": "Unidade Campina Grande",
         "imagem": "https://example.com/campina.jpg",
@@ -117,6 +119,7 @@ def _payload_unidade(**overrides):
     ],
 )
 def test_obter_unidade_inexistente_retorna_404(override_get_db, rota):
+    """Garante 404 para rotas de unidades inexistentes."""
     response = client.get(rota)
 
     assert response.status_code == 404
@@ -151,6 +154,7 @@ def test_criar_unidade_com_payloads_validos(
     payload,
     cidade_esperada,
 ):
+    """Garante criacao de unidade com payloads validos."""
     response = client.post("/unidades/", json=payload)
 
     assert response.status_code == 201
@@ -174,6 +178,7 @@ def test_criar_unidade_com_payloads_invalidos_retorna_422(
     override_get_db,
     payload,
 ):
+    """Garante 422 para payloads invalidos de unidade."""
     response = client.post("/unidades/", json=payload)
 
     assert response.status_code == 422
@@ -187,6 +192,7 @@ def test_criar_unidade_com_payloads_invalidos_retorna_422(
     ],
 )
 def test_excluir_unidade_inexistente_retorna_404(override_get_db, rota):
+    """Garante 404 ao excluir unidade inexistente."""
     response = client.delete(rota)
 
     assert response.status_code == 404
@@ -194,6 +200,7 @@ def test_excluir_unidade_inexistente_retorna_404(override_get_db, rota):
 
 
 def test_listar_unidades_vazio_retorna_lista_vazia(override_get_db):
+    """Garante listagem vazia quando nao ha unidades."""
     response = client.get("/unidades/")
 
     assert response.status_code == 200
@@ -201,6 +208,7 @@ def test_listar_unidades_vazio_retorna_lista_vazia(override_get_db):
 
 
 def test_listar_unidades_com_dados(override_get_db, unidade_valida):
+    """Garante listagem de unidade cadastrada."""
     response = client.get("/unidades/")
 
     assert response.status_code == 200
@@ -212,6 +220,7 @@ def test_listar_unidades_com_dados(override_get_db, unidade_valida):
 
 
 def test_obter_unidade_existente_retorna_endereco(override_get_db, unidade_valida):
+    """Garante busca de unidade existente com endereco."""
     response = client.get(f"/unidades/{unidade_valida.id}")
 
     assert response.status_code == 200
@@ -228,6 +237,7 @@ def test_obter_unidade_existente_retorna_endereco(override_get_db, unidade_valid
 
 
 def test_excluir_unidade_existente_remove_registro(override_get_db, unidade_valida):
+    """Garante exclusao de unidade existente."""
     unidade_id = unidade_valida.id
 
     delete_response = client.delete(f"/unidades/{unidade_id}")
