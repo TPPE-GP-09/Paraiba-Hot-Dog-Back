@@ -18,15 +18,11 @@ def _formatar_telefone_whatsapp(telefone: str) -> str:
 
 def _credenciais_configuradas() -> bool:
     """Verifica se as credenciais do Twilio estao corretamente preenchidas nas configuracoes."""
-    if not settings.twilio_account_sid or not settings.twilio_api_key_sid or not settings.twilio_auth_token:
+    if not settings.twilio_account_sid or not settings.twilio_auth_token:
         return False
     if settings.twilio_account_sid == "SEU_TWILIO_ACCOUNT_SID_AQUI":
         return False
-    if settings.twilio_api_key_sid == "SEU_TWILIO_API_KEY_SID_AQUI":
-        return False
     if settings.twilio_auth_token == "SEU_TWILIO_AUTH_TOKEN_AQUI":
-        return False
-    if not settings.twilio_api_key_sid.startswith("SK"):
         return False
     if not settings.twilio_whatsapp_from.startswith("whatsapp:"):
         return False
@@ -53,6 +49,11 @@ def enviar_boas_vindas(nome: str, telefone: str) -> dict:
 
     telefone_formatado = _formatar_telefone_whatsapp(telefone)
     destino = f"whatsapp:+{telefone_formatado}"
+    logger.warning(
+        "Credenciais OK. Preparando request Twilio para cliente=%s destino=%s",
+        nome,
+        destino,
+    )
     api_url = (
         f"https://api.twilio.com/2010-04-01/Accounts/"
         f"{settings.twilio_account_sid}/Messages.json"
@@ -71,14 +72,25 @@ def enviar_boas_vindas(nome: str, telefone: str) -> dict:
     }
 
     try:
+        logger.warning(
+            "Enviando request Twilio para cliente=%s destino=%s",
+            nome,
+            destino,
+        )
         response = requests.post(
             api_url,
             data=payload,
-            auth=(settings.twilio_api_key_sid, settings.twilio_auth_token),
+            auth=(settings.twilio_account_sid, settings.twilio_auth_token),
             timeout=10,
         )
+        logger.warning(
+            "Resposta Twilio recebida para cliente=%s destino=%s status=%s",
+            nome,
+            destino,
+            response.status_code,
+        )
         if response.status_code in (200, 201):
-            logger.info(
+            logger.warning(
                 "Mensagem de boas-vindas enviada com sucesso para cliente=%s telefone=%s",
                 nome,
                 destino,
