@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 POETRY := poetry
 
-.PHONY: help install shell run test pytest integration-test keycloak-up keycloak-token token docs docs-build tox docker-build docker-up docker-down logs migrate seed docker-seed alembic-revision
+.PHONY: help install shell run test pytest integration-test keycloak-up keycloak-token token docs docs-build tox docker-build docker-up docker-down logs migrate seed reset-seed docker-seed docker-reset-seed alembic-revision
 
 help:
 	@echo "Available targets:"
@@ -21,7 +21,9 @@ help:
 	@echo "  logs           : Tail docker-compose logs"
 	@echo "  migrate        : Run alembic upgrade head"
 	@echo "  seed           : Run migrations and seed local database"
+	@echo "  reset-seed     : Reset local database data and seed it"
 	@echo "  docker-seed    : Run seeds inside the API container"
+	@echo "  docker-reset-seed : Reset database data and seed it inside the API container"
 	@echo "  lint           : Run linter (pylint)"
 	@echo "  format         : Run code formatter (black)"
 	@echo "  typecheck      : Run static type checks (mypy)"
@@ -75,10 +77,16 @@ migrate:
 	$(POETRY) run alembic upgrade head
 
 seed: migrate
-	$(POETRY) run python scripts/seed.py
+	PYTHONPATH=. $(POETRY) run python scripts/seed.py
+
+reset-seed: migrate
+	PYTHONPATH=. $(POETRY) run python scripts/reset_seed.py
 
 docker-seed:
-	docker compose exec paraiba-hotdog-back python scripts/seed.py
+	docker compose exec paraiba-hotdog-back env PYTHONPATH=/app python scripts/seed.py
+
+docker-reset-seed:
+	docker compose exec paraiba-hotdog-back env PYTHONPATH=/app python scripts/reset_seed.py
 
 alembic-revision:
 	$(POETRY) run alembic revision --autogenerate -m "$(MSG)"

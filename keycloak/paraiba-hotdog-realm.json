@@ -1,6 +1,7 @@
 {
   "realm": "paraiba-hotdog",
   "enabled": true,
+  "accessTokenLifespan": 28800,
   "roles": {
     "realm": [
       {

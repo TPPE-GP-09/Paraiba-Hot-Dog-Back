@@ -10,14 +10,15 @@ KEYCLOAK_TEST_USERNAME="${KEYCLOAK_TEST_USERNAME:-integration-test}"
 KEYCLOAK_TEST_PASSWORD="${KEYCLOAK_TEST_PASSWORD:-integration-test}"
 KEYCLOAK_TEST_EMAIL="${KEYCLOAK_TEST_EMAIL:-integration-test@example.com}"
 KEYCLOAK_TEST_ROLE="${KEYCLOAK_TEST_ROLE:-administrador}"
+KEYCLOAK_ACCESS_TOKEN_LIFESPAN="${KEYCLOAK_ACCESS_TOKEN_LIFESPAN:-28800}"
 
 json_field() {
   local field="$1"
-  python -c "import json, sys; print(json.load(sys.stdin)[\"${field}\"])"
+  ${PYTHON_BIN} -c "import json, sys; print(json.load(sys.stdin)[\"${field}\"])"
 }
 
 json_first_id() {
-  python -c 'import json, sys; data = json.load(sys.stdin); print(data[0]["id"] if data else "")'
+  ${PYTHON_BIN} -c 'import json, sys; data = json.load(sys.stdin); print(data[0]["id"] if data else "")'
 }
 
 admin_token() {
@@ -72,6 +73,15 @@ ensure_role() {
     echo "Falha ao criar role ${KEYCLOAK_TEST_ROLE}. HTTP ${status}" >&2
     exit 1
   fi
+}
+
+ensure_token_lifespan() {
+  local token="$1"
+  curl -fsS -X PUT \
+    "${KEYCLOAK_BASE_URL}/admin/realms/${KEYCLOAK_REALM}" \
+    -H "Authorization: Bearer ${token}" \
+    -H "Content-Type: application/json" \
+    -d "{\"accessTokenLifespan\":${KEYCLOAK_ACCESS_TOKEN_LIFESPAN}}" >/dev/null
 }
 
 ensure_client() {
@@ -153,6 +163,12 @@ ensure_user() {
     -d "[${role}]" >/dev/null
 }
 
+PYTHON_BIN="${PYTHON_BIN:-$(command -v python3 || command -v python)}"
+if [[ -z "${PYTHON_BIN}" ]]; then
+  echo "python3 nao encontrado no PATH" >&2
+  exit 1
+fi
+
 docker compose up -d keycloak >/dev/null
 
 for _ in {1..60}; do
@@ -169,6 +185,7 @@ fi
 
 token="$(admin_token)"
 ensure_realm "${token}"
+ensure_token_lifespan "${token}"
 ensure_role "${token}"
 ensure_client "${token}"
 ensure_user "${token}"
