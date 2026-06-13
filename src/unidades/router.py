@@ -1,12 +1,36 @@
-from fastapi import APIRouter, Depends, status
+from datetime import time
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.unidades import repository
-from src.unidades.schema import UnidadeCreate, UnidadeRead, UnidadeUpdate
+from src.unidades.schema import EnderecoCreate, UnidadeCreate, UnidadeRead, UnidadeUpdate
 from src.security import get_current_user
 
 router = APIRouter()
+UPLOAD_DIR = Path("uploads/unidades")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+async def salvar_imagem_upload(file: UploadFile) -> str:
+    """Salva uma imagem de unidade enviada via multipart e retorna a URL publica."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Envie um arquivo de imagem valido.",
+        )
+
+    extensao = Path(file.filename or "").suffix.lower()
+    nome_arquivo = f"{uuid4()}{extensao}"
+    caminho = UPLOAD_DIR / nome_arquivo
+
+    with caminho.open("wb") as buffer:
+        buffer.write(await file.read())
+
+    return f"/uploads/unidades/{nome_arquivo}"
 
 
 @router.get("/", response_model=list[UnidadeRead])
@@ -27,8 +51,39 @@ def obter_unidade(unidade_id: int, db: Session = Depends(get_db)):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_user)],
 )
-def criar_unidade(data: UnidadeCreate, db: Session = Depends(get_db)):
-    """Cria uma nova unidade. Requer autenticacao."""
+async def criar_unidade(
+    nome: str = Form(...),
+    abertura: time = Form(...),
+    fechamento: time = Form(...),
+    cep: str = Form(...),
+    logradouro: str = Form(...),
+    bairro: str = Form(...),
+    cidade: str = Form(...),
+    estado: str = Form(...),
+    numero: str | None = Form(None),
+    complemento: str | None = Form(None),
+    descricao: str | None = Form(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Cria uma nova unidade e vincula a imagem enviada."""
+    imagem = await salvar_imagem_upload(file)
+    data = UnidadeCreate(
+        nome=nome,
+        imagem=imagem,
+        abertura=abertura,
+        fechamento=fechamento,
+        descricao=descricao,
+        endereco=EnderecoCreate(
+            cep=cep,
+            logradouro=logradouro,
+            numero=numero,
+            complemento=complemento,
+            bairro=bairro,
+            cidade=cidade,
+            estado=estado,
+        ),
+    )
     return repository.criar_unidade(db, data)
 
 
