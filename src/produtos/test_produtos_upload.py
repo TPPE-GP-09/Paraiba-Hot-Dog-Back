@@ -64,7 +64,7 @@ def test_criar_produto_relaciona_imagem(tmp_path, monkeypatch, db_session):
             pontos_fidelidade_por_unidade=0,
             disponivel_todas_unidades=True,
             unidade_ids=None,
-            file=arquivo,
+            imagem=arquivo,
             db=db,
         )
     )
@@ -95,7 +95,7 @@ def test_criar_produto_rejeita_arquivo_nao_imagem(tmp_path, monkeypatch, db_sess
                 pontos_fidelidade_por_unidade=0,
                 disponivel_todas_unidades=True,
                 unidade_ids=None,
-                file=arquivo,
+                imagem=arquivo,
                 db=db,
             )
         )

@@ -62,7 +62,7 @@ def test_criar_unidade_relaciona_imagem(tmp_path, monkeypatch, db_session):
             numero="100",
             complemento=None,
             descricao="Unidade principal",
-            file=arquivo,
+            imagem=arquivo,
             db=db_session,
         )
     )
@@ -96,7 +96,7 @@ def test_criar_unidade_rejeita_arquivo_nao_imagem(tmp_path, monkeypatch, db_sess
                 numero=None,
                 complemento=None,
                 descricao=None,
-                file=arquivo,
+                imagem=arquivo,
                 db=db_session,
             )
         )

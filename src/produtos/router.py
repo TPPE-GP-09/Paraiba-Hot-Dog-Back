@@ -26,24 +26,24 @@ from src.produtos.schema import (
 from src.security import get_current_user
 
 router = APIRouter()
-UPLOAD_DIR = Path("uploads/produtos")
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "produtos"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-async def salvar_imagem_upload(file: UploadFile) -> str:
+async def salvar_imagem_upload(imagem: UploadFile) -> str:
     """Salva uma imagem de produto enviada via multipart e retorna a URL publica."""
-    if not file.content_type or not file.content_type.startswith("image/"):
+    if not imagem.content_type or not imagem.content_type.startswith("image/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Envie um arquivo de imagem valido.",
         )
 
-    extensao = Path(file.filename or "").suffix.lower()
+    extensao = Path(imagem.filename or "").suffix.lower()
     nome_arquivo = f"{uuid4()}{extensao}"
     caminho = UPLOAD_DIR / nome_arquivo
 
     with caminho.open("wb") as buffer:
-        buffer.write(await file.read())
+        buffer.write(await imagem.read())
 
     return f"/uploads/produtos/{nome_arquivo}"
 
@@ -304,11 +304,11 @@ async def criar_produto(
     pontos_fidelidade_por_unidade: int = Form(0),
     disponivel_todas_unidades: bool = Form(True),
     unidade_ids: list[int] | None = Form(None),
-    file: UploadFile = File(...),
+    imagem: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> ProdutoRead:
     """Cria um novo produto e vincula a imagem enviada."""
-    imagem_url = await salvar_imagem_upload(file)
+    imagem_url = await salvar_imagem_upload(imagem)
     produto = ProdutoCreate(
         nome=nome,
         descricao=descricao,

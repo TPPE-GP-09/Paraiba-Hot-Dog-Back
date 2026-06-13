@@ -55,7 +55,7 @@ def test_criar_post_relaciona_imagem_ao_blog(tmp_path, monkeypatch, db_session):
             tipo=TipoNoticiaPromocao.promocao,
             data=date(2026, 6, 12),
             descricao="Descricao da promocao",
-            file=arquivo,
+            imagem=arquivo,
             db=db_session,
         )
     )
@@ -82,7 +82,7 @@ def test_criar_post_rejeita_arquivo_nao_imagem(tmp_path, monkeypatch, db_session
                 tipo=TipoNoticiaPromocao.promocao,
                 data=date(2026, 6, 12),
                 descricao=None,
-                file=arquivo,
+                imagem=arquivo,
                 db=db_session,
             )
         )

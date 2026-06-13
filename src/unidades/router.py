@@ -11,24 +11,24 @@ from src.unidades.schema import EnderecoCreate, UnidadeCreate, UnidadeRead, Unid
 from src.security import get_current_user
 
 router = APIRouter()
-UPLOAD_DIR = Path("uploads/unidades")
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "unidades"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-async def salvar_imagem_upload(file: UploadFile) -> str:
+async def salvar_imagem_upload(imagem: UploadFile) -> str:
     """Salva uma imagem de unidade enviada via multipart e retorna a URL publica."""
-    if not file.content_type or not file.content_type.startswith("image/"):
+    if not imagem.content_type or not imagem.content_type.startswith("image/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Envie um arquivo de imagem valido.",
         )
 
-    extensao = Path(file.filename or "").suffix.lower()
+    extensao = Path(imagem.filename or "").suffix.lower()
     nome_arquivo = f"{uuid4()}{extensao}"
     caminho = UPLOAD_DIR / nome_arquivo
 
     with caminho.open("wb") as buffer:
-        buffer.write(await file.read())
+        buffer.write(await imagem.read())
 
     return f"/uploads/unidades/{nome_arquivo}"
 
@@ -63,14 +63,14 @@ async def criar_unidade(
     numero: str | None = Form(None),
     complemento: str | None = Form(None),
     descricao: str | None = Form(None),
-    file: UploadFile = File(...),
+    imagem: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
     """Cria uma nova unidade e vincula a imagem enviada."""
-    imagem = await salvar_imagem_upload(file)
+    imagem_url = await salvar_imagem_upload(imagem)
     data = UnidadeCreate(
         nome=nome,
-        imagem=imagem,
+        imagem=imagem_url,
         abertura=abertura,
         fechamento=fechamento,
         descricao=descricao,
