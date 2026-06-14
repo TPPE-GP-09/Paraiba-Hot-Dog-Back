@@ -1,5 +1,10 @@
-from fastapi import Depends, FastAPI
+from pathlib import Path
 
+from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from src.bi.router import router as bi_router
 from src.clientes.router import router as clientes_router
 from src.usuarios.router import router as usuarios_router
 from src.produtos.router import router as produtos_router
@@ -9,7 +14,20 @@ from src.blog.router import router as blog_router
 from src.pedidos.router import router as pedidos_router
 from src.security import get_current_user
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+UPLOADS_DIR = BASE_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
 app = FastAPI(title="Paraiba Hot Dog API")
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 auth_dependencies = [Depends(get_current_user)]
 
@@ -50,6 +68,12 @@ app.include_router(
     pedidos_router,
     prefix="/pedidos",
     tags=["pedidos"],
+    dependencies=auth_dependencies,
+)
+app.include_router(
+    bi_router,
+    prefix="/bi",
+    tags=["bi"],
     dependencies=auth_dependencies,
 )
 
