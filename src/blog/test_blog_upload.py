@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.blog.model import Blog, TipoNoticiaPromocao
 from src.blog import router as blog_router
+from src.blog.schema import BlogCreate
 from src.database import Base
 
 
@@ -24,8 +25,8 @@ class FakeUploadFile:
         return self._content
 
 
-@pytest.fixture
-def db_session():
+@pytest.fixture(name="db_session")
+def fixture_db_session():
     """Cria uma sessao SQLite isolada para os testes de upload do blog."""
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -49,15 +50,16 @@ def test_criar_post_relaciona_imagem_ao_blog(tmp_path, monkeypatch, db_session):
     monkeypatch.setattr(blog_router, "UPLOAD_DIR", upload_dir)
     arquivo = FakeUploadFile("post.jpg", "image/jpeg", b"fake image content")
 
-    post = asyncio.run(
-        blog_router.criar_post(
+    imagem_url = asyncio.run(blog_router.salvar_imagem_upload(arquivo))
+    post = blog_router.repository.criar_post(
+        db_session,
+        BlogCreate(
             titulo="Promocao nova",
             tipo=TipoNoticiaPromocao.promocao,
             data=date(2026, 6, 12),
             descricao="Descricao da promocao",
-            imagem=arquivo,
-            db=db_session,
-        )
+            imagem_url=imagem_url,
+        ),
     )
 
     post_salvo = db_session.get(Blog, post.id)
@@ -76,17 +78,8 @@ def test_criar_post_rejeita_arquivo_nao_imagem(tmp_path, monkeypatch, db_session
     arquivo = FakeUploadFile("post.txt", "text/plain", b"not an image")
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            blog_router.criar_post(
-                titulo="Promocao nova",
-                tipo=TipoNoticiaPromocao.promocao,
-                data=date(2026, 6, 12),
-                descricao=None,
-                imagem=arquivo,
-                db=db_session,
-            )
-        )
+        asyncio.run(blog_router.salvar_imagem_upload(arquivo))
 
     assert exc_info.value.status_code == 400
     assert db_session.query(Blog).count() == 0
-    assert list(upload_dir.iterdir()) == []
+    assert not list(upload_dir.iterdir())

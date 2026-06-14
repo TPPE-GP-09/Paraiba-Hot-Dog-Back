@@ -18,6 +18,14 @@ class BlogCreate(BlogBase):
     pass
 
 
+class BlogMultipartCreate(BaseModel):
+    titulo: str = Field(..., max_length=255)
+    tipo: TipoNoticiaPromocao
+    data: date
+    imagem: bytes = Field(..., json_schema_extra={"format": "binary"})
+    descricao: Optional[str] = None
+
+
 class BlogUpdate(BaseModel):
     titulo: Optional[str] = Field(None, max_length=255)
     imagem_url: Optional[str] = Field(None, max_length=500)

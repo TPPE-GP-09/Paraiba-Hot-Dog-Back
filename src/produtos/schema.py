@@ -87,6 +87,30 @@ class ProdutoCreate(ProdutoBase):
     unidade_ids: list[int] = []
 
 
+class ProdutoMultipartCreate(BaseModel):
+    nome: str = Field(
+        ...,
+        max_length=255,
+    )
+
+    subcategoria_id: int = Field(
+        ...,
+        gt=0,
+    )
+
+    imagem: bytes = Field(..., json_schema_extra={"format": "binary"})
+
+    descricao: Optional[str] = None
+
+    ativo: bool = True
+
+    pontos_fidelidade_por_unidade: int = Field(default=0, ge=0)
+
+    disponivel_todas_unidades: bool = True
+
+    unidade_ids: list[int] = []
+
+
 class ProdutoUpdate(BaseModel):
     nome: Optional[str] = Field(
         None,

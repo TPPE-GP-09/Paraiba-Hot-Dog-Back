@@ -1,19 +1,32 @@
-from datetime import date
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, status
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from src.blog import repository
-from src.blog.model import TipoNoticiaPromocao
-from src.blog.schema import BlogCreate, BlogRead, BlogUpdate
+from src.blog.schema import BlogCreate, BlogMultipartCreate, BlogRead, BlogUpdate
 from src.database import get_db
 from src.security import get_current_user
 
 router = APIRouter()
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "blog"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _multipart_request_body(schema: type[BaseModel]) -> dict:
+    return {
+        "content": {
+            "multipart/form-data": {
+                "schema": schema.model_json_schema(),
+            },
+        },
+        "required": True,
+    }
+
+
+CRIAR_POST_REQUEST_BODY = _multipart_request_body(BlogMultipartCreate)
 
 
 async def salvar_imagem_upload(imagem: UploadFile) -> str:
@@ -34,6 +47,35 @@ async def salvar_imagem_upload(imagem: UploadFile) -> str:
     return f"/uploads/blog/{nome_arquivo}"
 
 
+def _erro_validacao(exc: ValidationError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
+
+
+def _is_upload_file(value: object) -> bool:
+    return hasattr(value, "read") and hasattr(value, "content_type")
+
+
+async def _blog_data_from_request(request: Request) -> BlogCreate:
+    content_type = request.headers.get("content-type", "")
+    try:
+        if content_type.startswith("multipart/form-data"):
+            form = await request.form()
+            imagem = form.get("imagem")
+            imagem_url = await salvar_imagem_upload(imagem) if _is_upload_file(imagem) else form.get("imagem_url")
+            return BlogCreate.model_validate(
+                {
+                    "titulo": form.get("titulo"),
+                    "imagem_url": imagem_url,
+                    "descricao": form.get("descricao"),
+                    "tipo": form.get("tipo"),
+                    "data": form.get("data"),
+                }
+            )
+        return BlogCreate.model_validate(await request.json())
+    except ValidationError as exc:
+        raise _erro_validacao(exc) from exc
+
+
 @router.get("/", response_model=list[BlogRead])
 def listar_posts(tipo: str | None = None, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Lista as postagens do blog com paginacao e filtro opcional por tipo."""
@@ -45,25 +87,14 @@ def listar_posts(tipo: str | None = None, skip: int = 0, limit: int = 100, db: S
     response_model=BlogRead,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_user)],
+    openapi_extra={"requestBody": CRIAR_POST_REQUEST_BODY},
 )
 async def criar_post(
-    titulo: str = Form(...),
-    tipo: TipoNoticiaPromocao = Form(...),
-    data: date = Form(...),
-    descricao: str | None = Form(None),
-    imagem: UploadFile = File(...),
+    request: Request,
     db: Session = Depends(get_db),
 ):
-    """Cria uma postagem do blog e vincula a imagem enviada."""
-    imagem_url = await salvar_imagem_upload(imagem)
-    post_data = BlogCreate(
-        titulo=titulo,
-        imagem_url=imagem_url,
-        descricao=descricao,
-        tipo=tipo,
-        data=data,
-    )
-    return repository.criar_post(db, post_data)
+    """Cria uma postagem do blog via JSON ou multipart com imagem."""
+    return repository.criar_post(db, await _blog_data_from_request(request))
 
 
 @router.get("/{post_id}", response_model=BlogRead)

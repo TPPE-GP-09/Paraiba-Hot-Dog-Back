@@ -1,18 +1,32 @@
-from datetime import time
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.unidades import repository
-from src.unidades.schema import EnderecoCreate, UnidadeCreate, UnidadeRead, UnidadeUpdate
+from src.unidades.schema import UnidadeCreate, UnidadeMultipartCreate, UnidadeRead, UnidadeUpdate
 from src.security import get_current_user
 
 router = APIRouter()
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "unidades"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _multipart_request_body(schema: type[BaseModel]) -> dict:
+    return {
+        "content": {
+            "multipart/form-data": {
+                "schema": schema.model_json_schema(),
+            },
+        },
+        "required": True,
+    }
+
+
+CRIAR_UNIDADE_REQUEST_BODY = _multipart_request_body(UnidadeMultipartCreate)
 
 
 async def salvar_imagem_upload(imagem: UploadFile) -> str:
@@ -33,6 +47,44 @@ async def salvar_imagem_upload(imagem: UploadFile) -> str:
     return f"/uploads/unidades/{nome_arquivo}"
 
 
+def _erro_validacao(exc: ValidationError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
+
+
+def _is_upload_file(value: object) -> bool:
+    return hasattr(value, "read") and hasattr(value, "content_type")
+
+
+async def _unidade_data_from_request(request: Request) -> UnidadeCreate:
+    content_type = request.headers.get("content-type", "")
+    try:
+        if content_type.startswith("multipart/form-data"):
+            form = await request.form()
+            imagem = form.get("imagem")
+            imagem_url = await salvar_imagem_upload(imagem) if _is_upload_file(imagem) else form.get("imagem")
+            return UnidadeCreate.model_validate(
+                {
+                    "nome": form.get("nome"),
+                    "imagem": imagem_url,
+                    "abertura": form.get("abertura"),
+                    "fechamento": form.get("fechamento"),
+                    "descricao": form.get("descricao"),
+                    "endereco": {
+                        "cep": form.get("cep"),
+                        "logradouro": form.get("logradouro"),
+                        "numero": form.get("numero"),
+                        "complemento": form.get("complemento"),
+                        "bairro": form.get("bairro"),
+                        "cidade": form.get("cidade"),
+                        "estado": form.get("estado"),
+                    },
+                }
+            )
+        return UnidadeCreate.model_validate(await request.json())
+    except ValidationError as exc:
+        raise _erro_validacao(exc) from exc
+
+
 @router.get("/", response_model=list[UnidadeRead])
 def listar_unidades(db: Session = Depends(get_db)):
     """Lista todas as unidades cadastradas."""
@@ -50,41 +102,14 @@ def obter_unidade(unidade_id: int, db: Session = Depends(get_db)):
     response_model=UnidadeRead,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_user)],
+    openapi_extra={"requestBody": CRIAR_UNIDADE_REQUEST_BODY},
 )
 async def criar_unidade(
-    nome: str = Form(...),
-    abertura: time = Form(...),
-    fechamento: time = Form(...),
-    cep: str = Form(...),
-    logradouro: str = Form(...),
-    bairro: str = Form(...),
-    cidade: str = Form(...),
-    estado: str = Form(...),
-    numero: str | None = Form(None),
-    complemento: str | None = Form(None),
-    descricao: str | None = Form(None),
-    imagem: UploadFile = File(...),
+    request: Request,
     db: Session = Depends(get_db),
 ):
-    """Cria uma nova unidade e vincula a imagem enviada."""
-    imagem_url = await salvar_imagem_upload(imagem)
-    data = UnidadeCreate(
-        nome=nome,
-        imagem=imagem_url,
-        abertura=abertura,
-        fechamento=fechamento,
-        descricao=descricao,
-        endereco=EnderecoCreate(
-            cep=cep,
-            logradouro=logradouro,
-            numero=numero,
-            complemento=complemento,
-            bairro=bairro,
-            cidade=cidade,
-            estado=estado,
-        ),
-    )
-    return repository.criar_unidade(db, data)
+    """Cria uma unidade via JSON ou multipart com imagem."""
+    return repository.criar_unidade(db, await _unidade_data_from_request(request))
 
 
 @router.patch(

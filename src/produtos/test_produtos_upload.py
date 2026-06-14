@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 from src.database import Base
 from src.produtos import router as produtos_router
 from src.produtos.model import Categoria, Produto, Subcategoria
+from src.produtos.schema import ProdutoCreate
 
 
 class FakeUploadFile:
@@ -23,8 +24,8 @@ class FakeUploadFile:
         return self._content
 
 
-@pytest.fixture
-def db_session():
+@pytest.fixture(name="db_session")
+def fixture_db_session():
     """Cria uma sessao SQLite isolada para os testes de upload de produto."""
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -55,18 +56,19 @@ def test_criar_produto_relaciona_imagem(tmp_path, monkeypatch, db_session):
     monkeypatch.setattr(produtos_router, "UPLOAD_DIR", upload_dir)
     arquivo = FakeUploadFile("produto.jpg", "image/jpeg", b"fake image content")
 
-    produto = asyncio.run(
-        produtos_router.criar_produto(
+    imagem_url = asyncio.run(produtos_router.salvar_imagem_upload(arquivo))
+    produto = produtos_router.repository.criar_produto(
+        db,
+        ProdutoCreate(
             nome="Hot dog simples",
             subcategoria_id=subcategoria.id,
             descricao="Classico",
             ativo=True,
             pontos_fidelidade_por_unidade=0,
             disponivel_todas_unidades=True,
-            unidade_ids=None,
-            imagem=arquivo,
-            db=db,
-        )
+            unidade_ids=[],
+            imagem_url=imagem_url,
+        ),
     )
 
     produto_salvo = db.get(Produto, produto.id)
@@ -79,27 +81,15 @@ def test_criar_produto_relaciona_imagem(tmp_path, monkeypatch, db_session):
 
 def test_criar_produto_rejeita_arquivo_nao_imagem(tmp_path, monkeypatch, db_session):
     """Garante que produto aceita apenas arquivos de imagem."""
-    db, subcategoria = db_session
+    db, _subcategoria = db_session
     upload_dir = tmp_path / "uploads" / "produtos"
     upload_dir.mkdir(parents=True)
     monkeypatch.setattr(produtos_router, "UPLOAD_DIR", upload_dir)
     arquivo = FakeUploadFile("produto.txt", "text/plain", b"not an image")
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            produtos_router.criar_produto(
-                nome="Hot dog simples",
-                subcategoria_id=subcategoria.id,
-                descricao=None,
-                ativo=True,
-                pontos_fidelidade_por_unidade=0,
-                disponivel_todas_unidades=True,
-                unidade_ids=None,
-                imagem=arquivo,
-                db=db,
-            )
-        )
+        asyncio.run(produtos_router.salvar_imagem_upload(arquivo))
 
     assert exc_info.value.status_code == 400
     assert db.query(Produto).count() == 0
-    assert list(upload_dir.iterdir()) == []
+    assert not list(upload_dir.iterdir())

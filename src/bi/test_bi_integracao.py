@@ -23,8 +23,8 @@ test_engine = create_engine(
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
 
-@pytest.fixture(scope="function")
-def db_session():
+@pytest.fixture(name="db_session", scope="function")
+def fixture_db_session():
     """Cria uma sessao SQLite isolada para os testes de BI."""
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
@@ -56,8 +56,8 @@ def fixture_cliente():
     return TestClient(app)
 
 
-@pytest.fixture
-def pedido_pago(db_session):
+@pytest.fixture(name="pedido_pago")
+def fixture_pedido_pago(db_session):
     """Cria um pedido pago com item vendido para alimentar o dashboard."""
     endereco = Endereco(
         cep="71900000",
@@ -120,7 +120,8 @@ def pedido_pago(db_session):
 
 
 @pytest.mark.integration
-def test_dashboard_retorna_indicadores_agregados(cliente, pedido_pago):
+@pytest.mark.usefixtures("pedido_pago")
+def test_dashboard_retorna_indicadores_agregados(cliente):
     """Garante que o BI consolida pedidos e itens vendidos."""
     resposta = cliente.get("/bi/dashboard")
 
