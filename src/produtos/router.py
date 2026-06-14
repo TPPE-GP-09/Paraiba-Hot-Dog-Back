@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -72,6 +73,41 @@ def _is_upload_file(value: object) -> bool:
     return hasattr(value, "read") and hasattr(value, "content_type")
 
 
+def _content_type(request: Request) -> str:
+    return request.headers.get("content-type", "").split(";", maxsplit=1)[0].lower()
+
+
+def _unsupported_media_type() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail="Content-Type nao suportado.",
+    )
+
+
+def _imagem_obrigatoria() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=[
+            {
+                "type": "missing",
+                "loc": ("body", "imagem"),
+                "msg": "Field required",
+                "input": None,
+            }
+        ],
+    )
+
+
+def _remover_imagem_url(imagem_url: str | None) -> None:
+    prefixo = "/uploads/produtos/"
+    if not imagem_url or not imagem_url.startswith(prefixo):
+        return
+
+    caminho = UPLOAD_DIR / imagem_url.removeprefix(prefixo)
+    if caminho.exists():
+        caminho.unlink()
+
+
 def _form_bool(value: object, default: bool) -> object:
     if value is None:
         return default
@@ -81,27 +117,47 @@ def _form_bool(value: object, default: bool) -> object:
 
 
 async def _produto_data_from_request(request: Request) -> ProdutoCreate:
-    content_type = request.headers.get("content-type", "")
+    content_type = _content_type(request)
     try:
-        if content_type.startswith("multipart/form-data"):
+        if content_type == "multipart/form-data":
             form = await request.form()
             imagem = form.get("imagem")
-            imagem_url = await salvar_imagem_upload(imagem) if _is_upload_file(imagem) else form.get("imagem_url")
+            unidade_ids = form.getlist("unidade_ids")
+            form_data = {
+                "nome": form.get("nome"),
+                "descricao": form.get("descricao"),
+                "ativo": _form_bool(form.get("ativo"), True),
+                "pontos_fidelidade_por_unidade": form.get("pontos_fidelidade_por_unidade", 0),
+                "disponivel_todas_unidades": _form_bool(form.get("disponivel_todas_unidades"), True),
+                "subcategoria_id": form.get("subcategoria_id"),
+                "unidade_ids": unidade_ids,
+            }
+            if not _is_upload_file(imagem):
+                raise _imagem_obrigatoria()
+            ProdutoMultipartCreate.model_validate({**form_data, "imagem": b"upload"})
+            imagem_url = await salvar_imagem_upload(imagem)
             return ProdutoCreate.model_validate(
                 {
-                    "nome": form.get("nome"),
-                    "descricao": form.get("descricao"),
+                    "nome": form_data["nome"],
+                    "descricao": form_data["descricao"],
                     "imagem_url": imagem_url,
-                    "ativo": _form_bool(form.get("ativo"), True),
-                    "pontos_fidelidade_por_unidade": form.get("pontos_fidelidade_por_unidade", 0),
-                    "disponivel_todas_unidades": _form_bool(form.get("disponivel_todas_unidades"), True),
-                    "subcategoria_id": form.get("subcategoria_id"),
-                    "unidade_ids": form.getlist("unidade_ids"),
+                    "ativo": form_data["ativo"],
+                    "pontos_fidelidade_por_unidade": form_data["pontos_fidelidade_por_unidade"],
+                    "disponivel_todas_unidades": form_data["disponivel_todas_unidades"],
+                    "subcategoria_id": form_data["subcategoria_id"],
+                    "unidade_ids": unidade_ids,
                 }
             )
-        return ProdutoCreate.model_validate(await request.json())
+        if content_type == "application/json":
+            return ProdutoCreate.model_validate(await request.json())
+        raise _unsupported_media_type()
     except ValidationError as exc:
         raise _erro_validacao(exc) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="JSON invalido.",
+        ) from exc
 
 
 @router.get(
@@ -359,7 +415,12 @@ async def criar_produto(
     db: Session = Depends(get_db),
 ) -> ProdutoRead:
     """Cria um produto via JSON ou multipart com imagem."""
-    return repository.criar_produto(db, await _produto_data_from_request(request))
+    produto = await _produto_data_from_request(request)
+    try:
+        return repository.criar_produto(db, produto)
+    except Exception:
+        _remover_imagem_url(produto.imagem_url)
+        raise
 
 
 @router.patch(

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -55,34 +56,92 @@ def _is_upload_file(value: object) -> bool:
     return hasattr(value, "read") and hasattr(value, "content_type")
 
 
+def _content_type(request: Request) -> str:
+    return request.headers.get("content-type", "").split(";", maxsplit=1)[0].lower()
+
+
+def _unsupported_media_type() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail="Content-Type nao suportado.",
+    )
+
+
+def _imagem_obrigatoria() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=[
+            {
+                "type": "missing",
+                "loc": ("body", "imagem"),
+                "msg": "Field required",
+                "input": None,
+            }
+        ],
+    )
+
+
+def _remover_imagem_url(imagem_url: str | None) -> None:
+    prefixo = "/uploads/unidades/"
+    if not imagem_url or not imagem_url.startswith(prefixo):
+        return
+
+    caminho = UPLOAD_DIR / imagem_url.removeprefix(prefixo)
+    if caminho.exists():
+        caminho.unlink()
+
+
 async def _unidade_data_from_request(request: Request) -> UnidadeCreate:
-    content_type = request.headers.get("content-type", "")
+    content_type = _content_type(request)
     try:
-        if content_type.startswith("multipart/form-data"):
+        if content_type == "multipart/form-data":
             form = await request.form()
             imagem = form.get("imagem")
-            imagem_url = await salvar_imagem_upload(imagem) if _is_upload_file(imagem) else form.get("imagem")
+            form_data = {
+                "nome": form.get("nome"),
+                "abertura": form.get("abertura"),
+                "fechamento": form.get("fechamento"),
+                "descricao": form.get("descricao"),
+                "cep": form.get("cep"),
+                "logradouro": form.get("logradouro"),
+                "numero": form.get("numero"),
+                "complemento": form.get("complemento"),
+                "bairro": form.get("bairro"),
+                "cidade": form.get("cidade"),
+                "estado": form.get("estado"),
+            }
+            if not _is_upload_file(imagem):
+                raise _imagem_obrigatoria()
+            UnidadeMultipartCreate.model_validate({**form_data, "imagem": b"upload"})
+            imagem_url = await salvar_imagem_upload(imagem)
             return UnidadeCreate.model_validate(
                 {
-                    "nome": form.get("nome"),
+                    "nome": form_data["nome"],
                     "imagem": imagem_url,
-                    "abertura": form.get("abertura"),
-                    "fechamento": form.get("fechamento"),
-                    "descricao": form.get("descricao"),
+                    "abertura": form_data["abertura"],
+                    "fechamento": form_data["fechamento"],
+                    "descricao": form_data["descricao"],
                     "endereco": {
-                        "cep": form.get("cep"),
-                        "logradouro": form.get("logradouro"),
-                        "numero": form.get("numero"),
-                        "complemento": form.get("complemento"),
-                        "bairro": form.get("bairro"),
-                        "cidade": form.get("cidade"),
-                        "estado": form.get("estado"),
+                        "cep": form_data["cep"],
+                        "logradouro": form_data["logradouro"],
+                        "numero": form_data["numero"],
+                        "complemento": form_data["complemento"],
+                        "bairro": form_data["bairro"],
+                        "cidade": form_data["cidade"],
+                        "estado": form_data["estado"],
                     },
                 }
             )
-        return UnidadeCreate.model_validate(await request.json())
+        if content_type == "application/json":
+            return UnidadeCreate.model_validate(await request.json())
+        raise _unsupported_media_type()
     except ValidationError as exc:
         raise _erro_validacao(exc) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="JSON invalido.",
+        ) from exc
 
 
 @router.get("/", response_model=list[UnidadeRead])
@@ -109,7 +168,12 @@ async def criar_unidade(
     db: Session = Depends(get_db),
 ):
     """Cria uma unidade via JSON ou multipart com imagem."""
-    return repository.criar_unidade(db, await _unidade_data_from_request(request))
+    data = await _unidade_data_from_request(request)
+    try:
+        return repository.criar_unidade(db, data)
+    except Exception:
+        _remover_imagem_url(data.imagem)
+        raise
 
 
 @router.patch(

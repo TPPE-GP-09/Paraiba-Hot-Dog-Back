@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from uuid import uuid4
 
@@ -55,13 +56,59 @@ def _is_upload_file(value: object) -> bool:
     return hasattr(value, "read") and hasattr(value, "content_type")
 
 
+def _content_type(request: Request) -> str:
+    return request.headers.get("content-type", "").split(";", maxsplit=1)[0].lower()
+
+
+def _unsupported_media_type() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail="Content-Type nao suportado.",
+    )
+
+
+def _imagem_obrigatoria() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=[
+            {
+                "type": "missing",
+                "loc": ("body", "imagem"),
+                "msg": "Field required",
+                "input": None,
+            }
+        ],
+    )
+
+
+def _remover_imagem_url(imagem_url: str | None) -> None:
+    prefixo = "/uploads/blog/"
+    if not imagem_url or not imagem_url.startswith(prefixo):
+        return
+
+    caminho = UPLOAD_DIR / imagem_url.removeprefix(prefixo)
+    if caminho.exists():
+        caminho.unlink()
+
+
 async def _blog_data_from_request(request: Request) -> BlogCreate:
-    content_type = request.headers.get("content-type", "")
+    content_type = _content_type(request)
     try:
-        if content_type.startswith("multipart/form-data"):
+        if content_type == "multipart/form-data":
             form = await request.form()
             imagem = form.get("imagem")
-            imagem_url = await salvar_imagem_upload(imagem) if _is_upload_file(imagem) else form.get("imagem_url")
+            if not _is_upload_file(imagem):
+                raise _imagem_obrigatoria()
+            BlogMultipartCreate.model_validate(
+                {
+                    "titulo": form.get("titulo"),
+                    "descricao": form.get("descricao"),
+                    "tipo": form.get("tipo"),
+                    "data": form.get("data"),
+                    "imagem": b"upload",
+                }
+            )
+            imagem_url = await salvar_imagem_upload(imagem)
             return BlogCreate.model_validate(
                 {
                     "titulo": form.get("titulo"),
@@ -71,9 +118,16 @@ async def _blog_data_from_request(request: Request) -> BlogCreate:
                     "data": form.get("data"),
                 }
             )
-        return BlogCreate.model_validate(await request.json())
+        if content_type == "application/json":
+            return BlogCreate.model_validate(await request.json())
+        raise _unsupported_media_type()
     except ValidationError as exc:
         raise _erro_validacao(exc) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="JSON invalido.",
+        ) from exc
 
 
 @router.get("/", response_model=list[BlogRead])
@@ -94,7 +148,12 @@ async def criar_post(
     db: Session = Depends(get_db),
 ):
     """Cria uma postagem do blog via JSON ou multipart com imagem."""
-    return repository.criar_post(db, await _blog_data_from_request(request))
+    post_data = await _blog_data_from_request(request)
+    try:
+        return repository.criar_post(db, post_data)
+    except Exception:
+        _remover_imagem_url(post_data.imagem_url)
+        raise
 
 
 @router.get("/{post_id}", response_model=BlogRead)
