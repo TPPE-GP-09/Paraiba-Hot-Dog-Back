@@ -23,8 +23,26 @@ class FakeUploadFile:
         return self._content
 
 
-@pytest.fixture
-def db_session():
+class FakeForm(dict):
+    def getlist(self, key: str) -> list:
+        value = self.get(key)
+        return value if isinstance(value, list) else []
+
+
+class FakeRequest:
+    def __init__(self, content_type: str, form_data: dict | None = None):
+        self.headers = {"content-type": content_type}
+        self._form_data = FakeForm(form_data or {})
+
+    async def form(self):
+        return self._form_data
+
+    async def json(self):
+        raise ValueError("json nao esperado")
+
+
+@pytest.fixture(name="db_session")
+def fixture_db_session():
     """Cria uma sessao SQLite isolada para os testes de upload de produto."""
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -55,19 +73,19 @@ def test_criar_produto_relaciona_imagem(tmp_path, monkeypatch, db_session):
     monkeypatch.setattr(produtos_router, "UPLOAD_DIR", upload_dir)
     arquivo = FakeUploadFile("produto.jpg", "image/jpeg", b"fake image content")
 
-    produto = asyncio.run(
-        produtos_router.criar_produto(
-            nome="Hot dog simples",
-            subcategoria_id=subcategoria.id,
-            descricao="Classico",
-            ativo=True,
-            pontos_fidelidade_por_unidade=0,
-            disponivel_todas_unidades=True,
-            unidade_ids=None,
-            imagem=arquivo,
-            db=db,
-        )
+    request = FakeRequest(
+        "multipart/form-data",
+        {
+            "nome": "Hot dog simples",
+            "subcategoria_id": str(subcategoria.id),
+            "descricao": "Classico",
+            "ativo": "true",
+            "pontos_fidelidade_por_unidade": "0",
+            "disponivel_todas_unidades": "true",
+            "imagem": arquivo,
+        },
     )
+    produto = asyncio.run(produtos_router.criar_produto(request, db))
 
     produto_salvo = db.get(Produto, produto.id)
     assert produto_salvo is not None
@@ -79,27 +97,97 @@ def test_criar_produto_relaciona_imagem(tmp_path, monkeypatch, db_session):
 
 def test_criar_produto_rejeita_arquivo_nao_imagem(tmp_path, monkeypatch, db_session):
     """Garante que produto aceita apenas arquivos de imagem."""
-    db, subcategoria = db_session
+    db, _subcategoria = db_session
     upload_dir = tmp_path / "uploads" / "produtos"
     upload_dir.mkdir(parents=True)
     monkeypatch.setattr(produtos_router, "UPLOAD_DIR", upload_dir)
     arquivo = FakeUploadFile("produto.txt", "text/plain", b"not an image")
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            produtos_router.criar_produto(
-                nome="Hot dog simples",
-                subcategoria_id=subcategoria.id,
-                descricao=None,
-                ativo=True,
-                pontos_fidelidade_por_unidade=0,
-                disponivel_todas_unidades=True,
-                unidade_ids=None,
-                imagem=arquivo,
-                db=db,
-            )
-        )
+        asyncio.run(produtos_router.salvar_imagem_upload(arquivo))
 
     assert exc_info.value.status_code == 400
     assert db.query(Produto).count() == 0
-    assert list(upload_dir.iterdir()) == []
+    assert not list(upload_dir.iterdir())
+
+
+def test_criar_produto_multipart_sem_imagem_retorna_422(tmp_path, monkeypatch, db_session):
+    """Garante que multipart exige arquivo de imagem."""
+    db, subcategoria = db_session
+    upload_dir = tmp_path / "uploads" / "produtos"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(produtos_router, "UPLOAD_DIR", upload_dir)
+    request = FakeRequest(
+        "multipart/form-data",
+        {
+            "nome": "Hot dog simples",
+            "subcategoria_id": str(subcategoria.id),
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(produtos_router.criar_produto(request, db))
+
+    assert exc_info.value.status_code == 422
+    assert db.query(Produto).count() == 0
+    assert not list(upload_dir.iterdir())
+
+
+def test_criar_produto_multipart_invalido_nao_salva_imagem(tmp_path, monkeypatch, db_session):
+    """Garante que validacao acontece antes de gravar arquivo."""
+    db, _subcategoria = db_session
+    upload_dir = tmp_path / "uploads" / "produtos"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(produtos_router, "UPLOAD_DIR", upload_dir)
+    request = FakeRequest(
+        "multipart/form-data",
+        {
+            "nome": "Hot dog simples",
+            "subcategoria_id": "abc",
+            "imagem": FakeUploadFile("produto.jpg", "image/jpeg", b"fake image content"),
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(produtos_router.criar_produto(request, db))
+
+    assert exc_info.value.status_code == 422
+    assert db.query(Produto).count() == 0
+    assert not list(upload_dir.iterdir())
+
+
+def test_criar_produto_remove_imagem_quando_repository_falha(tmp_path, monkeypatch, db_session):
+    """Garante limpeza do arquivo quando o banco falha depois do upload."""
+    db, subcategoria = db_session
+    upload_dir = tmp_path / "uploads" / "produtos"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(produtos_router, "UPLOAD_DIR", upload_dir)
+    request = FakeRequest(
+        "multipart/form-data",
+        {
+            "nome": "Hot dog simples",
+            "subcategoria_id": str(subcategoria.id),
+            "imagem": FakeUploadFile("produto.jpg", "image/jpeg", b"fake image content"),
+        },
+    )
+
+    def _falha_repository(_db, _data):
+        raise RuntimeError("falha no banco")
+
+    monkeypatch.setattr(produtos_router.repository, "criar_produto", _falha_repository)
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(produtos_router.criar_produto(request, db))
+
+    assert not list(upload_dir.iterdir())
+
+
+def test_criar_produto_content_type_invalido_retorna_415(db_session):
+    """Garante erro controlado para content type nao suportado."""
+    db, _subcategoria = db_session
+    request = FakeRequest("application/x-www-form-urlencoded")
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(produtos_router.criar_produto(request, db))
+
+    assert exc_info.value.status_code == 415

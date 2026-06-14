@@ -1,7 +1,6 @@
 """Testes do upload de imagens de unidades."""
 
 import asyncio
-from datetime import time
 
 import pytest
 from fastapi import HTTPException
@@ -24,8 +23,26 @@ class FakeUploadFile:
         return self._content
 
 
-@pytest.fixture
-def db_session():
+class FakeForm(dict):
+    def getlist(self, key: str) -> list:
+        value = self.get(key)
+        return value if isinstance(value, list) else []
+
+
+class FakeMultipartRequest:
+    def __init__(self, form_data: dict | None = None, content_type: str = "multipart/form-data"):
+        self.headers = {"content-type": content_type}
+        self._form_data = FakeForm(form_data or {})
+
+    async def form(self):
+        return self._form_data
+
+    async def json(self):
+        raise ValueError("json nao esperado")
+
+
+@pytest.fixture(name="db_session")
+def fixture_db_session():
     """Cria uma sessao SQLite isolada para os testes de upload de unidade."""
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -49,23 +66,23 @@ def test_criar_unidade_relaciona_imagem(tmp_path, monkeypatch, db_session):
     monkeypatch.setattr(unidades_router, "UPLOAD_DIR", upload_dir)
     arquivo = FakeUploadFile("unidade.png", "image/png", b"fake image content")
 
-    unidade = asyncio.run(
-        unidades_router.criar_unidade(
-            nome="Unidade Centro",
-            abertura=time(9, 0),
-            fechamento=time(22, 0),
-            cep="58000000",
-            logradouro="Rua Principal",
-            bairro="Centro",
-            cidade="Joao Pessoa",
-            estado="PB",
-            numero="100",
-            complemento=None,
-            descricao="Unidade principal",
-            imagem=arquivo,
-            db=db_session,
-        )
+    request = FakeMultipartRequest(
+        {
+            "nome": "Unidade Centro",
+            "abertura": "09:00:00",
+            "fechamento": "22:00:00",
+            "cep": "58000000",
+            "logradouro": "Rua Principal",
+            "bairro": "Centro",
+            "cidade": "Joao Pessoa",
+            "estado": "PB",
+            "numero": "100",
+            "complemento": None,
+            "descricao": "Unidade principal",
+            "imagem": arquivo,
+        }
     )
+    unidade = asyncio.run(unidades_router.criar_unidade(request, db_session))
 
     unidade_salva = db_session.get(Unidade, unidade.id)
     assert unidade_salva is not None
@@ -83,24 +100,104 @@ def test_criar_unidade_rejeita_arquivo_nao_imagem(tmp_path, monkeypatch, db_sess
     arquivo = FakeUploadFile("unidade.txt", "text/plain", b"not an image")
 
     with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            unidades_router.criar_unidade(
-                nome="Unidade Centro",
-                abertura=time(9, 0),
-                fechamento=time(22, 0),
-                cep="58000000",
-                logradouro="Rua Principal",
-                bairro="Centro",
-                cidade="Joao Pessoa",
-                estado="PB",
-                numero=None,
-                complemento=None,
-                descricao=None,
-                imagem=arquivo,
-                db=db_session,
-            )
-        )
+        asyncio.run(unidades_router.salvar_imagem_upload(arquivo))
 
     assert exc_info.value.status_code == 400
     assert db_session.query(Unidade).count() == 0
-    assert list(upload_dir.iterdir()) == []
+    assert not list(upload_dir.iterdir())
+
+
+def test_unidade_multipart_valida_limite_estado(tmp_path, monkeypatch):
+    """Garante 422 antes do banco quando estado excede o limite da coluna."""
+    upload_dir = tmp_path / "uploads" / "unidades"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(unidades_router, "UPLOAD_DIR", upload_dir)
+    request = FakeMultipartRequest(
+        {
+            "nome": "Unidade Centro",
+            "abertura": "11:00:00",
+            "fechamento": "23:00:00",
+            "cep": "58000000",
+            "logradouro": "Rua Principal",
+            "numero": "100",
+            "complemento": None,
+            "bairro": "Centro",
+            "cidade": "Joao Pessoa",
+            "estado": "aoba",
+            "descricao": "Unidade principal",
+            "imagem": FakeUploadFile("unidade.png", "image/png", b"fake image content"),
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(unidades_router._unidade_data_from_request(request))
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail[0]["loc"] == ("estado",)
+    assert not list(upload_dir.iterdir())
+
+
+def test_criar_unidade_multipart_sem_imagem_retorna_422(tmp_path, monkeypatch, db_session):
+    """Garante que multipart exige arquivo de imagem."""
+    upload_dir = tmp_path / "uploads" / "unidades"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(unidades_router, "UPLOAD_DIR", upload_dir)
+    request = FakeMultipartRequest(
+        {
+            "nome": "Unidade Centro",
+            "abertura": "11:00:00",
+            "fechamento": "23:00:00",
+            "cep": "58000000",
+            "logradouro": "Rua Principal",
+            "bairro": "Centro",
+            "cidade": "Joao Pessoa",
+            "estado": "PB",
+        }
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(unidades_router.criar_unidade(request, db_session))
+
+    assert exc_info.value.status_code == 422
+    assert db_session.query(Unidade).count() == 0
+    assert not list(upload_dir.iterdir())
+
+
+def test_criar_unidade_remove_imagem_quando_repository_falha(tmp_path, monkeypatch, db_session):
+    """Garante limpeza do arquivo quando o banco falha depois do upload."""
+    upload_dir = tmp_path / "uploads" / "unidades"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(unidades_router, "UPLOAD_DIR", upload_dir)
+    request = FakeMultipartRequest(
+        {
+            "nome": "Unidade Centro",
+            "abertura": "11:00:00",
+            "fechamento": "23:00:00",
+            "cep": "58000000",
+            "logradouro": "Rua Principal",
+            "bairro": "Centro",
+            "cidade": "Joao Pessoa",
+            "estado": "PB",
+            "imagem": FakeUploadFile("unidade.png", "image/png", b"fake image content"),
+        }
+    )
+
+    def _falha_repository(_db, _data):
+        raise RuntimeError("falha no banco")
+
+    monkeypatch.setattr(unidades_router.repository, "criar_unidade", _falha_repository)
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(unidades_router.criar_unidade(request, db_session))
+
+    assert not list(upload_dir.iterdir())
+
+
+def test_criar_unidade_content_type_invalido_retorna_415(db_session):
+    """Garante erro controlado para content type nao suportado."""
+    request = FakeMultipartRequest(content_type="application/x-www-form-urlencoded")
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(unidades_router.criar_unidade(request, db_session))
+
+    assert exc_info.value.status_code == 415

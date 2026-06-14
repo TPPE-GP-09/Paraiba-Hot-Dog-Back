@@ -30,7 +30,7 @@ def _item_total(item: ItemPedido) -> Decimal:
 
 def _variacao(atual: Decimal, anterior: Decimal) -> Decimal:
     if anterior == 0:
-        return Decimal("0")
+        return Decimal("100.00") if atual > 0 else Decimal("0.00")
     return _percent(((atual - anterior) / anterior) * Decimal("100"))
 
 
@@ -53,40 +53,80 @@ def _pedidos_validos(db: Session, unidade_id: int | None) -> list[Pedido]:
     return query.order_by(Pedido.created_at.asc()).all()
 
 
-def obter_dashboard(db: Session, unidade_id: int | None = None) -> BiDashboardRead:
-    pedidos = _pedidos_validos(db, unidade_id)
-    agora = datetime.now()
-    ano_anterior, mes_anterior = _mes_anterior(agora)
+def _pedidos_do_mes(pedidos: list[Pedido], ano: int, mes: int) -> list[Pedido]:
+    return [pedido for pedido in pedidos if pedido.created_at.year == ano and pedido.created_at.month == mes]
 
+
+def _totais_pedidos(pedidos: list[Pedido]) -> tuple[Decimal, Decimal, int, Decimal]:
     receita_bruta = _money(sum((pedido.subtotal for pedido in pedidos), Decimal("0")))
     lucro_liquido = _money(sum((pedido.total for pedido in pedidos), Decimal("0")))
     total_pedidos = len(pedidos)
-    ticket_medio = _money(lucro_liquido / total_pedidos) if total_pedidos else Decimal("0.00")
+    ticket_medio = _money(receita_bruta / total_pedidos) if total_pedidos else Decimal("0.00")
+    return receita_bruta, lucro_liquido, total_pedidos, ticket_medio
 
-    pedidos_mes_atual = [
-        pedido for pedido in pedidos if pedido.created_at.year == agora.year and pedido.created_at.month == agora.month
-    ]
-    pedidos_mes_anterior = [
-        pedido
-        for pedido in pedidos
-        if pedido.created_at.year == ano_anterior and pedido.created_at.month == mes_anterior
-    ]
 
+def _variacoes_mensais(pedidos: list[Pedido], agora: datetime) -> dict[str, Decimal]:
+    ano_anterior, mes_anterior = _mes_anterior(agora)
+    pedidos_mes_atual = _pedidos_do_mes(pedidos, agora.year, agora.month)
+    pedidos_mes_anterior = _pedidos_do_mes(pedidos, ano_anterior, mes_anterior)
     receita_atual = sum((pedido.subtotal for pedido in pedidos_mes_atual), Decimal("0"))
     receita_anterior = sum((pedido.subtotal for pedido in pedidos_mes_anterior), Decimal("0"))
     lucro_atual = sum((pedido.total for pedido in pedidos_mes_atual), Decimal("0"))
     lucro_anterior = sum((pedido.total for pedido in pedidos_mes_anterior), Decimal("0"))
-    ticket_atual = lucro_atual / len(pedidos_mes_atual) if pedidos_mes_atual else Decimal("0")
-    ticket_anterior = lucro_anterior / len(pedidos_mes_anterior) if pedidos_mes_anterior else Decimal("0")
+    ticket_atual = receita_atual / len(pedidos_mes_atual) if pedidos_mes_atual else Decimal("0")
+    ticket_anterior = receita_anterior / len(pedidos_mes_anterior) if pedidos_mes_anterior else Decimal("0")
 
+    return {
+        "variacao_receita_bruta": _variacao(receita_atual, receita_anterior),
+        "variacao_lucro_liquido": _variacao(lucro_atual, lucro_anterior),
+        "variacao_ticket_medio": _variacao(ticket_atual, ticket_anterior),
+        "variacao_total_pedidos": _variacao(Decimal(len(pedidos_mes_atual)), Decimal(len(pedidos_mes_anterior))),
+    }
+
+
+def _resumo_kpis(pedidos: list[Pedido], agora: datetime) -> BiKpiRead:
+    receita_bruta, lucro_liquido, total_pedidos, ticket_medio = _totais_pedidos(pedidos)
+    return BiKpiRead(
+        receita_bruta=receita_bruta,
+        lucro_liquido=lucro_liquido,
+        ticket_medio=ticket_medio,
+        total_pedidos=total_pedidos,
+        **_variacoes_mensais(pedidos, agora),
+    )
+
+
+def _pedido_total_itens(pedido: Pedido) -> Decimal:
+    return sum(
+        (
+            _item_total(item)
+            for item in pedido.itens
+            if item.status != StatusItemPedido.cancelado
+        ),
+        Decimal("0"),
+    )
+
+
+def _receita_liquida_item(pedido: Pedido, receita_item: Decimal, receita_pedido: Decimal) -> Decimal:
+    if not receita_pedido:
+        return Decimal("0")
+    return (receita_item / receita_pedido) * pedido.total
+
+
+def _produtos_vendidos(
+    pedidos: list[Pedido],
+    agora: datetime,
+) -> tuple[list[BiVendaHoraRead], list[BiProdutoRead]]:
     vendas_por_hora = defaultdict(int)
     produtos: dict[int, dict[str, Decimal | int | str]] = {}
+    ano_anterior, mes_anterior = _mes_anterior(agora)
 
     for pedido in pedidos:
+        receita_pedido = _pedido_total_itens(pedido)
         for item in pedido.itens:
             if item.status == StatusItemPedido.cancelado:
                 continue
 
+            receita_item = _item_total(item)
             vendas_por_hora[pedido.created_at.hour] += item.quantidade
             produto = produtos.setdefault(
                 item.produto_id,
@@ -94,13 +134,29 @@ def obter_dashboard(db: Session, unidade_id: int | None = None) -> BiDashboardRe
                     "nome": item.produto_nome,
                     "quantidade": 0,
                     "receita": Decimal("0"),
+                    "receita_liquida": Decimal("0"),
+                    "receita_atual": Decimal("0"),
+                    "receita_anterior": Decimal("0"),
                 },
             )
             produto["quantidade"] = int(produto["quantidade"]) + item.quantidade
-            produto["receita"] = Decimal(produto["receita"]) + _item_total(item)
+            produto["receita"] = Decimal(produto["receita"]) + receita_item
+            produto["receita_liquida"] = Decimal(produto["receita_liquida"]) + _receita_liquida_item(
+                pedido,
+                receita_item,
+                receita_pedido,
+            )
+            if pedido.created_at.year == agora.year and pedido.created_at.month == agora.month:
+                produto["receita_atual"] = Decimal(produto["receita_atual"]) + receita_item
+            if pedido.created_at.year == ano_anterior and pedido.created_at.month == mes_anterior:
+                produto["receita_anterior"] = Decimal(produto["receita_anterior"]) + receita_item
 
+    return _vendas_por_hora(vendas_por_hora), _top_produtos(produtos)
+
+
+def _vendas_por_hora(vendas_por_hora: dict[int, int]) -> list[BiVendaHoraRead]:
     maior_volume = max(vendas_por_hora.values(), default=0)
-    vendas_hora = [
+    return [
         BiVendaHoraRead(
             hora=f"{hora:02d}h",
             quantidade=vendas_por_hora.get(hora, 0),
@@ -109,25 +165,29 @@ def obter_dashboard(db: Session, unidade_id: int | None = None) -> BiDashboardRe
         for hora in range(10, 22)
     ]
 
+
+def _top_produtos(produtos: dict[int, dict[str, Decimal | int | str]]) -> list[BiProdutoRead]:
     produtos_ordenados = sorted(
         produtos.items(),
         key=lambda item: (int(item[1]["quantidade"]), Decimal(item[1]["receita"])),
         reverse=True,
     )
-    top_produtos = [
+    return [
         BiProdutoRead(
             rank=indice,
             produto_id=produto_id,
             nome=str(dados["nome"]),
             quantidade=int(dados["quantidade"]),
             receita=_money(Decimal(dados["receita"])),
-            variacao=Decimal("0.00"),
+            variacao=_variacao(Decimal(dados["receita_atual"]), Decimal(dados["receita_anterior"])),
         )
         for indice, (produto_id, dados) in enumerate(produtos_ordenados[:10], start=1)
     ]
 
+
+def _mix_produtos(top_produtos: list[BiProdutoRead]) -> list[BiMixProdutoRead]:
     quantidade_total = sum((produto.quantidade for produto in top_produtos), 0)
-    mix_produtos = [
+    return [
         BiMixProdutoRead(
             nome=produto.nome,
             percentual=_percent((Decimal(produto.quantidade) / quantidade_total) * Decimal("100"))
@@ -137,33 +197,52 @@ def obter_dashboard(db: Session, unidade_id: int | None = None) -> BiDashboardRe
         for produto in top_produtos[:3]
     ]
 
-    destaque = None
-    if top_produtos:
-        principal = top_produtos[0]
-        participacao = (
-            _percent((principal.receita / lucro_liquido) * Decimal("100")) if lucro_liquido else Decimal("0.00")
-        )
-        destaque = BiDestaqueRead(
-            nome=principal.nome,
-            margem_ganho=participacao,
-            margem_liquida=participacao,
-        )
+
+def _destaque(
+    top_produtos: list[BiProdutoRead],
+    produtos: list[Pedido],
+    receita_bruta: Decimal,
+    lucro_liquido: Decimal,
+) -> BiDestaqueRead | None:
+    if not top_produtos:
+        return None
+
+    principal = top_produtos[0]
+    receita_liquida = _produto_receita_liquida(principal.produto_id, produtos)
+    margem_ganho = _percent((principal.receita / receita_bruta) * Decimal("100")) if receita_bruta else Decimal("0.00")
+    margem_liquida = (
+        _percent((receita_liquida / lucro_liquido) * Decimal("100")) if lucro_liquido else Decimal("0.00")
+    )
+    return BiDestaqueRead(
+        nome=principal.nome,
+        margem_ganho=margem_ganho,
+        margem_liquida=margem_liquida,
+    )
+
+
+def _produto_receita_liquida(produto_id: int, pedidos: list[Pedido]) -> Decimal:
+    receita_liquida = Decimal("0")
+    for pedido in pedidos:
+        receita_pedido = _pedido_total_itens(pedido)
+        for item in pedido.itens:
+            if item.status == StatusItemPedido.cancelado or item.produto_id != produto_id:
+                continue
+            receita_liquida += _receita_liquida_item(pedido, _item_total(item), receita_pedido)
+    return _money(receita_liquida)
+
+
+def obter_dashboard(db: Session, unidade_id: int | None = None) -> BiDashboardRead:
+    pedidos = _pedidos_validos(db, unidade_id)
+    agora = datetime.now()
+    resumo = _resumo_kpis(pedidos, agora)
+    vendas_hora, top_produtos = _produtos_vendidos(pedidos, agora)
 
     return BiDashboardRead(
-        kpis=BiKpiRead(
-            receita_bruta=receita_bruta,
-            lucro_liquido=lucro_liquido,
-            ticket_medio=ticket_medio,
-            total_pedidos=total_pedidos,
-            variacao_receita_bruta=_variacao(receita_atual, receita_anterior),
-            variacao_lucro_liquido=_variacao(lucro_atual, lucro_anterior),
-            variacao_ticket_medio=_variacao(ticket_atual, ticket_anterior),
-            variacao_total_pedidos=_variacao(Decimal(len(pedidos_mes_atual)), Decimal(len(pedidos_mes_anterior))),
-        ),
+        kpis=resumo,
         vendas_por_hora=vendas_hora,
         top_produtos=top_produtos,
-        mix_produtos=mix_produtos,
-        vendas_totais=lucro_liquido,
-        pedidos_registrados=total_pedidos,
-        destaque=destaque,
+        mix_produtos=_mix_produtos(top_produtos),
+        vendas_totais=resumo.receita_bruta,
+        pedidos_registrados=resumo.total_pedidos,
+        destaque=_destaque(top_produtos, pedidos, resumo.receita_bruta, resumo.lucro_liquido),
     )
