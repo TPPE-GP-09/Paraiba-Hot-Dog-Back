@@ -1,6 +1,7 @@
 """Testes do upload de imagens de unidades."""
 
 import asyncio
+from datetime import time
 
 import pytest
 from fastapi import HTTPException
@@ -9,8 +10,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.database import Base
+from src.unidades import repository
 from src.unidades import router as unidades_router
-from src.unidades.model import Unidade
+from src.unidades.model import Endereco, Unidade
 
 
 class FakeUploadFile:
@@ -201,3 +203,90 @@ def test_criar_unidade_content_type_invalido_retorna_415(db_session):
         asyncio.run(unidades_router.criar_unidade(request, db_session))
 
     assert exc_info.value.status_code == 415
+
+
+def _criar_unidade_no_banco(db_session, imagem: str | None = None) -> Unidade:
+    """Auxiliar: cria endereco + unidade no banco e retorna a unidade."""
+    endereco = Endereco(
+        cep="58000000",
+        logradouro="Rua Principal",
+        bairro="Centro",
+        cidade="Joao Pessoa",
+        estado="PB",
+    )
+    db_session.add(endereco)
+    db_session.flush()
+    unidade = Unidade(
+        nome="Unidade Teste",
+        imagem=imagem,
+        abertura=time(9, 0),
+        fechamento=time(22, 0),
+        endereco_id=endereco.id,
+    )
+    db_session.add(unidade)
+    db_session.commit()
+    db_session.refresh(unidade)
+    return unidade
+
+
+def test_atualizar_unidade_com_nova_imagem_troca_arquivo(tmp_path, monkeypatch, db_session):
+    """Garante que ao enviar nova imagem no PATCH, o arquivo antigo e excluido."""
+    upload_dir = tmp_path / "uploads" / "unidades"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(unidades_router, "UPLOAD_DIR", upload_dir)
+
+    imagem_antiga_path = upload_dir / "old.png"
+    imagem_antiga_path.write_bytes(b"conteudo antigo")
+    unidade = _criar_unidade_no_banco(db_session, imagem="/uploads/unidades/old.png")
+
+    nova_imagem = FakeUploadFile("new.jpg", "image/jpeg", b"conteudo novo")
+    request = FakeMultipartRequest({"imagem": nova_imagem})
+
+    asyncio.run(unidades_router.atualizar_unidade(request, unidade.id, db_session))
+
+    assert not imagem_antiga_path.exists(), "imagem antiga deve ser excluida"
+    db_session.refresh(unidade)
+    assert unidade.imagem is not None
+    assert unidade.imagem != "/uploads/unidades/old.png"
+    assert unidade.imagem.endswith(".jpg")
+    assert len(list(upload_dir.iterdir())) == 1
+
+
+def test_atualizar_unidade_sem_nova_imagem_mantem_arquivo(tmp_path, monkeypatch, db_session):
+    """Garante que ao nao enviar imagem no PATCH, o arquivo existente e preservado."""
+    upload_dir = tmp_path / "uploads" / "unidades"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(unidades_router, "UPLOAD_DIR", upload_dir)
+
+    imagem_path = upload_dir / "existing.png"
+    imagem_path.write_bytes(b"imagem existente")
+    unidade = _criar_unidade_no_banco(db_session, imagem="/uploads/unidades/existing.png")
+
+    request = FakeMultipartRequest({"nome": "Nome Atualizado"})
+
+    asyncio.run(unidades_router.atualizar_unidade(request, unidade.id, db_session))
+
+    assert imagem_path.exists(), "imagem existente deve ser preservada"
+    db_session.refresh(unidade)
+    assert unidade.nome == "Nome Atualizado"
+    assert unidade.imagem == "/uploads/unidades/existing.png"
+
+
+def test_excluir_unidade_remove_imagem_e_endereco(tmp_path, monkeypatch, db_session):
+    """Garante que ao excluir unidade, o arquivo de imagem e o endereco sao removidos."""
+    upload_dir = tmp_path / "uploads" / "unidades"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(unidades_router, "UPLOAD_DIR", upload_dir)
+
+    imagem_path = upload_dir / "to_delete.png"
+    imagem_path.write_bytes(b"imagem da unidade")
+    unidade = _criar_unidade_no_banco(db_session, imagem="/uploads/unidades/to_delete.png")
+    unidade_id = unidade.id
+    endereco_id = unidade.endereco_id
+
+    imagem_url = repository.excluir_unidade(db_session, unidade_id)
+    unidades_router._remover_imagem_url(imagem_url)
+
+    assert not imagem_path.exists(), "arquivo de imagem deve ser excluido"
+    assert db_session.get(Unidade, unidade_id) is None, "unidade deve ser removida do banco"
+    assert db_session.get(Endereco, endereco_id) is None, "endereco orfao deve ser removido do banco"

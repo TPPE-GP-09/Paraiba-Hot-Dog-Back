@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from src.database import Base, get_db
 from src.main import app
+from src.security import get_current_user
 from src.unidades.model import Endereco, Unidade
 
 client = TestClient(app)
@@ -245,3 +246,40 @@ def test_excluir_unidade_existente_remove_registro(override_get_db, unidade_vali
 
     assert delete_response.status_code == 204
     assert get_response.status_code == 404
+
+
+def test_criar_unidade_com_mapa_url(override_get_db):
+    """Garante que mapa_url e salvo e retornado ao criar unidade."""
+    payload = _payload_unidade()
+    payload["mapa_url"] = "https://maps.example.com/unidade-campina"
+
+    response = client.post("/unidades/", json=payload)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["mapa_url"] == "https://maps.example.com/unidade-campina"
+
+
+def test_criar_unidade_sem_mapa_url_retorna_none(override_get_db):
+    """Garante que mapa_url e None quando nao informado."""
+    response = client.post("/unidades/", json=_payload_unidade())
+
+    assert response.status_code == 201
+    assert response.json()["mapa_url"] is None
+
+
+@pytest.mark.parametrize(
+    "method,path,body",
+    [
+        ("post", "/unidades/", {"json": _payload_unidade()}),
+        ("patch", "/unidades/9999", {"json": {"nome": "Novo"}}),
+        ("delete", "/unidades/9999", {}),
+    ],
+)
+def test_operacao_restrita_sem_role_administrador_retorna_403(override_get_db, method, path, body):
+    """Garante 403 para usuarios sem role administrador em operacoes de escrita."""
+    app.dependency_overrides[get_current_user] = lambda: {"sub": "user", "roles": ["caixa"]}
+
+    response = getattr(client, method)(path, **body)
+
+    assert response.status_code == 403

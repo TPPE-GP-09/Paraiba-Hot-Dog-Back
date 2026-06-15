@@ -40,6 +40,7 @@ class UnidadeBase(BaseModel):
     abertura: time
     fechamento: time
     descricao: Optional[str] = None
+    mapa_url: Optional[str] = Field(None, max_length=500)
 
 
 class UnidadeCreate(UnidadeBase):
@@ -59,6 +60,23 @@ class UnidadeMultipartCreate(BaseModel):
     numero: Optional[str] = Field(None, max_length=10)
     complemento: Optional[str] = Field(None, max_length=255)
     descricao: Optional[str] = None
+    mapa_url: Optional[str] = Field(None, max_length=500)
+
+
+class UnidadeMultipartUpdate(BaseModel):
+    nome: Optional[str] = Field(None, max_length=255)
+    abertura: Optional[time] = None
+    fechamento: Optional[time] = None
+    descricao: Optional[str] = None
+    mapa_url: Optional[str] = Field(None, max_length=500)
+    imagem: Optional[bytes] = Field(None, json_schema_extra={"format": "binary"})
+    cep: Optional[str] = Field(None, max_length=8)
+    logradouro: Optional[str] = Field(None, max_length=255)
+    numero: Optional[str] = Field(None, max_length=10)
+    complemento: Optional[str] = Field(None, max_length=255)
+    bairro: Optional[str] = Field(None, max_length=255)
+    cidade: Optional[str] = Field(None, max_length=255)
+    estado: Optional[str] = Field(None, max_length=2)
 
 
 class UnidadeUpdate(BaseModel):
@@ -67,6 +85,7 @@ class UnidadeUpdate(BaseModel):
     abertura: Optional[time] = None
     fechamento: Optional[time] = None
     descricao: Optional[str] = None
+    mapa_url: Optional[str] = Field(None, max_length=500)
     endereco: Optional[EnderecoUpdate] = None
 
 
