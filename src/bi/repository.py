@@ -231,11 +231,35 @@ def _produto_receita_liquida(produto_id: int, pedidos: list[Pedido]) -> Decimal:
     return _money(receita_liquida)
 
 
-def obter_dashboard(db: Session, unidade_id: int | None = None) -> BiDashboardRead:
-    pedidos = _pedidos_validos(db, unidade_id)
+def obter_dashboard(
+    db: Session,
+    unidade_id: int | None = None,
+    ano: int | None = None,
+    mes: int | None = None,
+    fechamento_mes: bool = False,
+) -> BiDashboardRead:
     agora = datetime.now()
-    resumo = _resumo_kpis(pedidos, agora)
-    vendas_hora, top_produtos = _produtos_vendidos(pedidos, agora)
+    pedidos = _pedidos_validos(db, unidade_id)
+
+    if fechamento_mes:
+        ref_ano, ref_mes = _mes_anterior(agora)
+        agora_ref = agora.replace(year=ref_ano, month=ref_mes, day=1)
+        pedidos_filtrados = [p for p in pedidos if p.created_at.year == ref_ano]
+        pedidos_kpi = _pedidos_do_mes(pedidos_filtrados, ref_ano, ref_mes)
+    elif mes is not None:
+        ref_ano = ano if ano is not None else agora.year
+        agora_ref = agora.replace(year=ref_ano, month=mes, day=1)
+        pedidos_filtrados = [p for p in pedidos if p.created_at.year == ref_ano]
+        pedidos_kpi = _pedidos_do_mes(pedidos_filtrados, ref_ano, mes)
+    elif ano is not None:
+        agora_ref = agora.replace(year=ano, day=1)
+        pedidos_kpi = [p for p in pedidos if p.created_at.year == ano]
+    else:
+        agora_ref = agora
+        pedidos_kpi = pedidos
+
+    resumo = _resumo_kpis(pedidos_kpi, agora_ref)
+    vendas_hora, top_produtos = _produtos_vendidos(pedidos_kpi, agora_ref)
 
     return BiDashboardRead(
         kpis=resumo,
@@ -244,5 +268,5 @@ def obter_dashboard(db: Session, unidade_id: int | None = None) -> BiDashboardRe
         mix_produtos=_mix_produtos(top_produtos),
         vendas_totais=resumo.receita_bruta,
         pedidos_registrados=resumo.total_pedidos,
-        destaque=_destaque(top_produtos, pedidos, resumo.receita_bruta, resumo.lucro_liquido),
+        destaque=_destaque(top_produtos, pedidos_kpi, resumo.receita_bruta, resumo.lucro_liquido),
     )

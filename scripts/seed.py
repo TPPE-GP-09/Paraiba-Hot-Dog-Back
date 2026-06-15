@@ -1,6 +1,6 @@
 """Limpa o banco e popula dados iniciais reais para desenvolvimento."""
 
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from sqlalchemy import text
@@ -9,7 +9,14 @@ from sqlalchemy.orm import Session
 from src.blog.model import Blog, TipoNoticiaPromocao
 from src.clientes.model import Cliente
 from src.database import Base, SessionLocal
-from src.pedidos.model import ItemPedido, ItemPedidoAdicional, Pedido
+from src.pedidos.model import (
+    FormaPagamento,
+    ItemPedido,
+    ItemPedidoAdicional,
+    Pedido,
+    StatusItemPedido,
+    StatusPedido,
+)
 from src.permissoes.model import Permissao, TipoPermissao
 from src.produtos.model import (
     Categoria,
@@ -115,18 +122,27 @@ def criar_blog(db: Session) -> None:
     db.add_all(posts)
 
 
-def criar_cliente(db: Session) -> Cliente:
-    """Cadastra um cliente inicial para testes manuais."""
-    cliente = Cliente(
-        nome="Daniel Ferreira",
-        telefone="61999990001",
-        email="daniel.ferreira@example.com",
-        pontos_fidelidade=12,
-        ativo=True,
-    )
-    db.add(cliente)
+def criar_clientes(db: Session) -> list[Cliente]:
+    """Cadastra clientes iniciais para testes manuais e pedidos fake."""
+    dados_clientes = [
+        ("Daniel Ferreira", "61999990001", "daniel.ferreira@example.com", 12),
+        ("Mariana Alves", "61999990002", "mariana.alves@example.com", 6),
+        ("Pedro Lima", "61999990003", "pedro.lima@example.com", 3),
+        ("Ana Beatriz", "61999990004", "ana.beatriz@example.com", 9),
+    ]
+    clientes = [
+        Cliente(
+            nome=nome,
+            telefone=telefone,
+            email=email,
+            pontos_fidelidade=pontos,
+            ativo=True,
+        )
+        for nome, telefone, email, pontos in dados_clientes
+    ]
+    db.add_all(clientes)
     db.flush()
-    return cliente
+    return clientes
 
 
 def criar_usuario(db: Session, unidade: Unidade, permissoes: list[Permissao]) -> Usuario:
@@ -154,6 +170,7 @@ def criar_categoria_com_subcategoria(db: Session, categoria_nome: str, subcatego
     return subcategoria
 
 
+# pylint: disable=too-many-arguments
 def criar_produto(
     db: Session,
     *,
@@ -237,7 +254,10 @@ def seed_hot_dogs(db: Session, unidades: list[Unidade]) -> None:
     produtos = [
         (
             "TRADICIONAL",
-            "Pao de hot-dog, maionese, salsicha perdigao, queijo mucarela, molho de tomate caseiro, milho e batata palha.",
+            (
+                "Pao de hot-dog, maionese, salsicha perdigao, queijo mucarela, "
+                "molho de tomate caseiro, milho e batata palha."
+            ),
             [
                 ("Simples - 1 Salsicha", TipoVariacao.normal, "17.00"),
                 ("Duplo - 2 Salsichas", TipoVariacao.normal, "20.00"),
@@ -247,7 +267,11 @@ def seed_hot_dogs(db: Session, unidades: list[Unidade]) -> None:
         ),
         (
             "ARRETADO",
-            "Pao de hot-dog, maionese, salsicha perdigao, queijo mucarela, molho de tomate caseiro, carne moida temperada, milho, vinagrete, batata palha e parmesao.",
+            (
+                "Pao de hot-dog, maionese, salsicha perdigao, queijo mucarela, "
+                "molho de tomate caseiro, carne moida temperada, milho, "
+                "vinagrete, batata palha e parmesao."
+            ),
             [
                 ("Simples - 1 Salsicha", TipoVariacao.normal, "21.00"),
                 ("Duplo - 2 Salsichas", TipoVariacao.normal, "24.00"),
@@ -257,7 +281,10 @@ def seed_hot_dogs(db: Session, unidades: list[Unidade]) -> None:
         ),
         (
             "PARAIBANO",
-            "Pao de hot-dog, maionese, salsicha perdigao, carne moida temperada, milho, vinagrete, parmesao e ovo de codorna.",
+            (
+                "Pao de hot-dog, maionese, salsicha perdigao, carne moida "
+                "temperada, milho, vinagrete, parmesao e ovo de codorna."
+            ),
             [
                 ("Simples - 1 Salsicha", TipoVariacao.normal, "21.00"),
                 ("Duplo - 2 Salsichas", TipoVariacao.normal, "24.00"),
@@ -277,7 +304,10 @@ def seed_hot_dogs(db: Session, unidades: list[Unidade]) -> None:
         ),
         (
             "VEGETARIANO",
-            "Pao de hot-dog, maionese, queijo mucarela, molho de tomate caseiro, milho, vinagrete, batata palha, parmesao e ovo de codorna.",
+            (
+                "Pao de hot-dog, maionese, queijo mucarela, molho de tomate "
+                "caseiro, milho, vinagrete, batata palha, parmesao e ovo de codorna."
+            ),
             [
                 ("Simples", TipoVariacao.normal, "20.00"),
                 ("Combo", TipoVariacao.combo, "30.00"),
@@ -377,6 +407,192 @@ def seed_smashdogs(db: Session, unidades: list[Unidade]) -> None:
         )
 
 
+def _momento_pedido(dias_atras: int, hora: int, minuto: int) -> datetime:
+    """Monta uma data fechada para pedidos fake do BI."""
+    hoje = datetime.now().replace(hour=hora, minute=minuto, second=0, microsecond=0)
+    return hoje - timedelta(days=dias_atras)
+
+
+def _adicionais_do_item(produto: Produto, limite: int) -> list[ItemPedidoAdicional]:
+    """Seleciona alguns adicionais do produto para variar o ticket dos pedidos fake."""
+    adicionais = []
+    for adicional in produto.adicionais[:limite]:
+        adicionais.append(
+            ItemPedidoAdicional(
+                adicional_id=adicional.id,
+                nome=adicional.nome,
+                preco=adicional.preco,
+            )
+        )
+    return adicionais
+
+
+def _criar_item_pedido(
+    variacao: ProdutoVariacao,
+    quantidade: int,
+    adicionais_limite: int,
+) -> ItemPedido:
+    """Cria um item de pedido pago com snapshot de produto, variacao e adicionais."""
+    produto = variacao.produto
+    item = ItemPedido(
+        produto_variacao_id=variacao.id,
+        produto_id=produto.id,
+        produto_nome=produto.nome,
+        produto_variacao_nome=variacao.nome,
+        quantidade=quantidade,
+        preco_unitario=variacao.preco,
+        status=StatusItemPedido.entregue,
+        lote=1,
+    )
+    item.adicionais = _adicionais_do_item(produto, adicionais_limite)
+    return item
+
+
+def _total_item(item: ItemPedido) -> Decimal:
+    adicionais = sum((adicional.preco for adicional in item.adicionais), Decimal("0"))
+    return Decimal(item.quantidade) * (item.preco_unitario + adicionais)
+
+
+def _criar_pedido_fake(
+    db: Session,
+    *,
+    unidade: Unidade,
+    cliente: Cliente | None,
+    momento: datetime,
+    itens: list[ItemPedido],
+    forma_pagamento: FormaPagamento,
+    desconto: Decimal = Decimal("0.00"),
+) -> Pedido:
+    """Cria um pedido pago para popular indicadores do BI."""
+    subtotal = sum((_total_item(item) for item in itens), Decimal("0.00"))
+    pedido = Pedido(
+        unidade_id=unidade.id,
+        cliente_id=cliente.id if cliente else None,
+        nome_comanda=cliente.nome if cliente else "Cliente Balcao",
+        status=StatusPedido.pago,
+        subtotal=subtotal,
+        desconto_fidelidade=min(desconto, subtotal),
+        total=max(subtotal - desconto, Decimal("0.00")),
+        forma_pagamento=forma_pagamento,
+        pontos_fidelidade_utilizados=12 if desconto else 0,
+        pontos_fidelidade_creditados=True,
+        created_at=momento,
+        fechado_em=momento + timedelta(minutes=18),
+    )
+    pedido.itens = itens
+    db.add(pedido)
+    return pedido
+
+
+def seed_pedidos_bi(db: Session, unidades: list[Unidade], clientes: list[Cliente]) -> None:
+    """Cadastra pedidos pagos fake para demonstrar a tela de BI."""
+    db.flush()
+    variacoes = db.query(ProdutoVariacao).order_by(ProdutoVariacao.id.asc()).all()
+    if len(variacoes) < 8:
+        return
+
+    pedidos = [
+        (
+            4,
+            18,
+            10,
+            0,
+            0,
+            FormaPagamento.pix,
+            Decimal("0.00"),
+            [(0, 2, 1), (5, 1, 0)],
+        ),
+        (
+            4,
+            19,
+            35,
+            0,
+            1,
+            FormaPagamento.credito,
+            Decimal("0.00"),
+            [(1, 1, 2), (6, 2, 0)],
+        ),
+        (3, 20, 5, 1, 2, FormaPagamento.debito, Decimal("0.00"), [(2, 2, 1)]),
+        (
+            3,
+            21,
+            15,
+            1,
+            None,
+            FormaPagamento.pix,
+            Decimal("0.00"),
+            [(10, 1, 1), (7, 1, 0)],
+        ),
+        (2, 18, 45, 0, 3, FormaPagamento.dinheiro, Decimal("17.00"), [(3, 2, 2)]),
+        (
+            2,
+            19,
+            20,
+            1,
+            0,
+            FormaPagamento.credito,
+            Decimal("0.00"),
+            [(4, 1, 1), (8, 2, 0)],
+        ),
+        (1, 20, 50, 0, 1, FormaPagamento.pix, Decimal("0.00"), [(11, 2, 1)]),
+        (
+            1,
+            21,
+            25,
+            1,
+            2,
+            FormaPagamento.debito,
+            Decimal("0.00"),
+            [(12, 1, 2), (9, 1, 0)],
+        ),
+        (
+            18,
+            18,
+            15,
+            0,
+            0,
+            FormaPagamento.pix,
+            Decimal("0.00"),
+            [(0, 1, 0), (5, 1, 0)],
+        ),
+        (18, 19, 40, 1, 1, FormaPagamento.credito, Decimal("0.00"), [(1, 1, 1)]),
+        (
+            17,
+            20,
+            30,
+            0,
+            2,
+            FormaPagamento.debito,
+            Decimal("0.00"),
+            [(2, 1, 1), (6, 1, 0)],
+        ),
+        (16, 21, 5, 1, None, FormaPagamento.dinheiro, Decimal("0.00"), [(10, 1, 0)]),
+        (36, 18, 20, 0, 0, FormaPagamento.pix, Decimal("0.00"), [(0, 1, 0)]),
+        (35, 19, 10, 1, 1, FormaPagamento.credito, Decimal("0.00"), [(1, 1, 0)]),
+        (34, 20, 45, 0, 2, FormaPagamento.debito, Decimal("0.00"), [(5, 1, 0)]),
+        (33, 21, 30, 1, 3, FormaPagamento.pix, Decimal("0.00"), [(10, 1, 1)]),
+    ]
+
+    for dias, hora, minuto, unidade_idx, cliente_idx, pagamento, desconto, itens_dados in pedidos:
+        itens = [
+            _criar_item_pedido(
+                variacoes[variacao_idx % len(variacoes)],
+                quantidade,
+                adicionais_limite,
+            )
+            for variacao_idx, quantidade, adicionais_limite in itens_dados
+        ]
+        _criar_pedido_fake(
+            db,
+            unidade=unidades[unidade_idx],
+            cliente=clientes[cliente_idx] if cliente_idx is not None else None,
+            momento=_momento_pedido(dias, hora, minuto),
+            itens=itens,
+            forma_pagamento=pagamento,
+            desconto=desconto,
+        )
+
+
 def run() -> None:
     """Executa limpeza e carga inicial em uma transacao unica."""
     db = SessionLocal()
@@ -385,11 +601,12 @@ def run() -> None:
         permissoes = criar_permissoes(db)
         unidades = criar_unidades(db)
         criar_blog(db)
-        criar_cliente(db)
+        clientes = criar_clientes(db)
         criar_usuario(db, unidades[0], permissoes)
         seed_hot_dogs(db, unidades)
         seed_acompanhamentos(db, unidades)
         seed_smashdogs(db, unidades)
+        seed_pedidos_bi(db, unidades, clientes)
         db.commit()
     except Exception:
         db.rollback()
