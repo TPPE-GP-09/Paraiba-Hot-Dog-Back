@@ -8,8 +8,14 @@ from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.unidades import repository
-from src.unidades.schema import UnidadeCreate, UnidadeMultipartCreate, UnidadeRead, UnidadeUpdate
-from src.security import get_current_user
+from src.unidades.schema import (
+    UnidadeCreate,
+    UnidadeMultipartCreate,
+    UnidadeMultipartUpdate,
+    UnidadeRead,
+    UnidadeUpdate,
+)
+from src.security import require_roles
 
 router = APIRouter()
 UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "unidades"
@@ -28,6 +34,7 @@ def _multipart_request_body(schema: type[BaseModel]) -> dict:
 
 
 CRIAR_UNIDADE_REQUEST_BODY = _multipart_request_body(UnidadeMultipartCreate)
+ATUALIZAR_UNIDADE_REQUEST_BODY = _multipart_request_body(UnidadeMultipartUpdate)
 
 
 async def salvar_imagem_upload(imagem: UploadFile) -> str:
@@ -102,6 +109,7 @@ async def _unidade_data_from_request(request: Request) -> UnidadeCreate:
                 "abertura": form.get("abertura"),
                 "fechamento": form.get("fechamento"),
                 "descricao": form.get("descricao"),
+                "mapa_url": form.get("mapa_url"),
                 "cep": form.get("cep"),
                 "logradouro": form.get("logradouro"),
                 "numero": form.get("numero"),
@@ -121,6 +129,7 @@ async def _unidade_data_from_request(request: Request) -> UnidadeCreate:
                     "abertura": form_data["abertura"],
                     "fechamento": form_data["fechamento"],
                     "descricao": form_data["descricao"],
+                    "mapa_url": form_data["mapa_url"],
                     "endereco": {
                         "cep": form_data["cep"],
                         "logradouro": form_data["logradouro"],
@@ -136,6 +145,45 @@ async def _unidade_data_from_request(request: Request) -> UnidadeCreate:
             return UnidadeCreate.model_validate(await request.json())
         raise _unsupported_media_type()
     except ValidationError as exc:
+        raise _erro_validacao(exc) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="JSON invalido.",
+        ) from exc
+
+
+async def _unidade_update_from_request(request: Request) -> tuple[UnidadeUpdate, str | None]:
+    """Interpreta JSON ou multipart/form-data e retorna (dados, nova_imagem_url)."""
+    content_type = _content_type(request)
+    nova_imagem_url: str | None = None
+    try:
+        if content_type == "multipart/form-data":
+            form = await request.form()
+            imagem = form.get("imagem")
+
+            if _is_upload_file(imagem):
+                nova_imagem_url = await salvar_imagem_upload(imagem)
+
+            campos_unidade = ["nome", "abertura", "fechamento", "descricao", "mapa_url"]
+            update_data: dict = {k: form.get(k) for k in campos_unidade if form.get(k) is not None}
+
+            if nova_imagem_url:
+                update_data["imagem"] = nova_imagem_url
+
+            campos_endereco = ["cep", "logradouro", "numero", "complemento", "bairro", "cidade", "estado"]
+            endereco_data = {k: form.get(k) for k in campos_endereco if form.get(k) is not None}
+            if endereco_data:
+                update_data["endereco"] = endereco_data
+
+            return UnidadeUpdate.model_validate(update_data), nova_imagem_url
+
+        if content_type == "application/json":
+            return UnidadeUpdate.model_validate(await request.json()), None
+
+        raise _unsupported_media_type()
+    except ValidationError as exc:
+        _remover_imagem_url(nova_imagem_url)
         raise _erro_validacao(exc) from exc
     except json.JSONDecodeError as exc:
         raise HTTPException(
@@ -160,14 +208,14 @@ def obter_unidade(unidade_id: int, db: Session = Depends(get_db)):
     "/",
     response_model=UnidadeRead,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_roles("administrador"))],
     openapi_extra={"requestBody": CRIAR_UNIDADE_REQUEST_BODY},
 )
 async def criar_unidade(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Cria uma unidade via JSON ou multipart com imagem."""
+    """Cria uma unidade via JSON ou multipart com imagem. Requer role administrador."""
     data = await _unidade_data_from_request(request)
     try:
         return repository.criar_unidade(db, data)
@@ -179,18 +227,36 @@ async def criar_unidade(
 @router.patch(
     "/{unidade_id}",
     response_model=UnidadeRead,
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_roles("administrador"))],
+    openapi_extra={"requestBody": ATUALIZAR_UNIDADE_REQUEST_BODY},
 )
-def atualizar_unidade(unidade_id: int, data: UnidadeUpdate, db: Session = Depends(get_db)):
-    """Atualiza parcialmente uma unidade existente. Requer autenticacao."""
-    return repository.atualizar_unidade(db, unidade_id, data)
+async def atualizar_unidade(
+    request: Request,
+    unidade_id: int,
+    db: Session = Depends(get_db),
+):
+    """Atualiza parcialmente uma unidade via JSON ou multipart. Requer role administrador."""
+    data, nova_imagem_url = await _unidade_update_from_request(request)
+
+    unidade = repository.obter_unidade(db, unidade_id)
+    imagem_antiga = unidade.imagem if nova_imagem_url else None
+
+    try:
+        updated = repository.atualizar_unidade(db, unidade_id, data)
+    except Exception:
+        _remover_imagem_url(nova_imagem_url)
+        raise
+
+    _remover_imagem_url(imagem_antiga)
+    return updated
 
 
 @router.delete(
     "/{unidade_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_roles("administrador"))],
 )
 def excluir_unidade(unidade_id: int, db: Session = Depends(get_db)):
-    """Remove uma unidade pelo ID. Requer autenticacao."""
-    repository.excluir_unidade(db, unidade_id)
+    """Remove uma unidade, seu endereco e sua imagem. Requer role administrador."""
+    imagem_url = repository.excluir_unidade(db, unidade_id)
+    _remover_imagem_url(imagem_url)

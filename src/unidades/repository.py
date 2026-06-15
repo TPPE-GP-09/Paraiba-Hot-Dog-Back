@@ -54,8 +54,19 @@ def atualizar_unidade(db: Session, unidade_id: int, data: UnidadeUpdate) -> Unid
     return unidade
 
 
-def excluir_unidade(db: Session, unidade_id: int) -> None:
-    """Remove permanentemente uma unidade do banco de dados."""
+def excluir_unidade(db: Session, unidade_id: int) -> str | None:
+    """Remove permanentemente uma unidade, seu endereco associado e retorna a url da imagem."""
     unidade = obter_unidade(db, unidade_id)
+    imagem_url = unidade.imagem
+    endereco_id = unidade.endereco_id
+
     db.delete(unidade)
+    db.flush()
+
+    if endereco_id is not None:
+        endereco = db.get(Endereco, endereco_id)
+        if endereco is not None:
+            db.delete(endereco)
+
     db.commit()
+    return imagem_url
