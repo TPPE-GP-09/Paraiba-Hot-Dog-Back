@@ -180,13 +180,14 @@ def criar_produto(
     descricao: str,
     variacoes: list[tuple[str, TipoVariacao, str]],
     adicionais: list[tuple[str, str]] | None = None,
+    imagem_url: str | None = None,
     pontos: int = 1,
 ) -> Produto:
     """Cria produto com variacoes de preco e adicionais opcionais."""
     produto = Produto(
         nome=nome,
         descricao=descricao,
-        imagem_url=None,
+        imagem_url=imagem_url,
         ativo=True,
         pontos_fidelidade_por_unidade=pontos,
         disponivel_todas_unidades=True,
@@ -222,100 +223,148 @@ def criar_produto(
 def adicionais_hot_dog() -> list[tuple[str, str]]:
     """Retorna adicionais padrao dos hot dogs."""
     return [
-        ("Carne", "5.00"),
-        ("Queijo", "5.00"),
-        ("Bacon", "5.00"),
-        ("Ovo de Codorna", "2.00"),
-        ("Milho", "2.00"),
-        ("Vinagrete", "2.00"),
-        ("Parmesao", "2.00"),
-        ("Maionese Extra - Alho Ervas", "3.00"),
-        ("Maionese Extra - Tradicional", "3.00"),
-        ("Maionese Extra - Apimentada", "3.00"),
-        ("Maionese Extra - Bacon", "3.00"),
+        ("Salsicha extra", "4.00"),
+        ("Carne moida", "5.00"),
+        ("Queijo mucarela", "4.00"),
+        ("Ovo de codorna", "3.00"),
+        ("Batata palha extra", "2.00"),
     ]
 
 
 def adicionais_smashdog() -> list[tuple[str, str]]:
     """Retorna adicionais padrao dos smashdogs."""
     return [
-        ("Carne", "7.00"),
-        ("Bacon", "5.00"),
-        ("Queijo", "4.00"),
-        ("Salada", "4.00"),
-        ("Pickles", "4.00"),
-        ("Salsicha", "3.00"),
+        ("Burger artesanal 120g", "10.00"),
+        ("Bacon em tiras", "5.00"),
+        ("Queijo mucarela", "4.00"),
+        ("Maionese artesanal", "3.00"),
+        ("Alface, tomate e cebola roxa", "3.00"),
     ]
+
+
+def adicionais_bebida() -> list[tuple[str, str]]:
+    """Retorna adicionais padrao das bebidas."""
+    return [
+        ("Xarope extra", "3.00"),
+        ("Copo com gelo", "1.00"),
+    ]
+
+
+def imagem_produto(nome_arquivo: str) -> str:
+    """Retorna a URL publica de uma imagem movida para uploads/produtos."""
+    return f"/uploads/produtos/{nome_arquivo}"
 
 
 def seed_hot_dogs(db: Session, unidades: list[Unidade]) -> None:
     """Cadastra o cardapio Paraiba Hot Dog."""
-    subcategoria = criar_categoria_com_subcategoria(db, "Paraiba Hot Dog", "Lanches")
+    subcategoria = criar_categoria_com_subcategoria(db, "Hotdogs", "Hotdogs")
     produtos = [
         (
-            "TRADICIONAL",
+            "Tradicional",
             (
-                "Pao de hot-dog, maionese, salsicha perdigao, queijo mucarela, "
+                "Pao de leite Ninho, salsicha Perdigao, queijo mucarela artesanal, "
                 "molho de tomate caseiro, milho e batata palha."
             ),
             [
-                ("Simples - 1 Salsicha", TipoVariacao.normal, "17.00"),
-                ("Duplo - 2 Salsichas", TipoVariacao.normal, "20.00"),
-                ("Combo Simples", TipoVariacao.combo, "27.00"),
-                ("Combo Duplo", TipoVariacao.combo, "30.00"),
+                ("Normal", TipoVariacao.normal, "17.00"),
+                ("Combo", TipoVariacao.combo, "27.00"),
             ],
+            "dog-tradicional.jpeg",
         ),
         (
-            "ARRETADO",
+            "Paraibano",
             (
-                "Pao de hot-dog, maionese, salsicha perdigao, queijo mucarela, "
-                "molho de tomate caseiro, carne moida temperada, milho, "
-                "vinagrete, batata palha e parmesao."
+                "Pao de leite Ninho, salsicha Perdigao, carne moida temperada, "
+                "molho de tomate artesanal, milho, vinagrete, parmesao e ovo de codorna."
             ),
             [
-                ("Simples - 1 Salsicha", TipoVariacao.normal, "21.00"),
-                ("Duplo - 2 Salsichas", TipoVariacao.normal, "24.00"),
-                ("Combo Simples", TipoVariacao.combo, "31.00"),
-                ("Combo Duplo", TipoVariacao.combo, "34.00"),
+                ("Normal", TipoVariacao.normal, "21.00"),
+                ("Combo", TipoVariacao.combo, "31.00"),
             ],
+            "dog-paraibano.jpeg",
         ),
         (
-            "PARAIBANO",
+            "Paraibano Duplo",
             (
-                "Pao de hot-dog, maionese, salsicha perdigao, carne moida "
-                "temperada, milho, vinagrete, parmesao e ovo de codorna."
+                "Pao de leite Ninho, 2 salsichas Perdigao, carne moida temperada, "
+                "molho de tomate caseiro, milho, vinagrete, parmesao e ovo de codorna."
             ),
             [
-                ("Simples - 1 Salsicha", TipoVariacao.normal, "21.00"),
-                ("Duplo - 2 Salsichas", TipoVariacao.normal, "24.00"),
-                ("Combo Simples", TipoVariacao.combo, "31.00"),
-                ("Combo Duplo", TipoVariacao.combo, "34.00"),
+                ("Normal", TipoVariacao.normal, "26.00"),
+                ("Combo", TipoVariacao.combo, "36.00"),
             ],
+            "dog-paraibano.jpeg",
         ),
         (
-            "BIXIN",
-            "Pao de hot-dog, maionese, salsicha perdigao, molho de tomate caseiro e batata palha.",
-            [
-                ("Simples - 1 Salsicha", TipoVariacao.normal, "11.00"),
-                ("Duplo - 2 Salsichas", TipoVariacao.normal, "14.00"),
-                ("Combo Simples", TipoVariacao.combo, "21.00"),
-                ("Combo Duplo", TipoVariacao.combo, "24.00"),
-            ],
-        ),
-        (
-            "VEGETARIANO",
+            "Arretado",
             (
-                "Pao de hot-dog, maionese, queijo mucarela, molho de tomate "
-                "caseiro, milho, vinagrete, batata palha, parmesao e ovo de codorna."
+                "Pao de leite Ninho, salsicha Perdigao, queijo mucarela artesanal, "
+                "carne moida temperada, milho, vinagrete, parmesao e batata palha."
             ),
             [
-                ("Simples", TipoVariacao.normal, "20.00"),
+                ("Normal", TipoVariacao.normal, "24.00"),
+                ("Combo", TipoVariacao.combo, "34.00"),
+            ],
+            "dog-arretado.jpeg",
+        ),
+        (
+            "Vegetariano",
+            (
+                "Pao de leite Ninho, queijo mucarela artesanal, molho de tomate "
+                "caseiro, milho, vinagrete, ovo de codorna e batata palha."
+            ),
+            [
+                ("Normal", TipoVariacao.normal, "20.00"),
                 ("Combo", TipoVariacao.combo, "30.00"),
             ],
+            "dog-vegetariano.jpeg",
+        ),
+        (
+            "Arretado Duplo",
+            (
+                "Pao de leite Ninho, 2 salsichas Perdigao, queijo mucarela artesanal, "
+                "molho de tomate caseiro, carne moida temperada, milho, vinagrete, "
+                "parmesao e batata palha."
+            ),
+            [
+                ("Normal", TipoVariacao.normal, "29.00"),
+                ("Combo", TipoVariacao.combo, "39.00"),
+            ],
+            "dog-arretado.jpeg",
+        ),
+        (
+            "Tradicional Duplo",
+            (
+                "Pao de leite Ninho, 2 salsichas Perdigao, queijo mucarela artesanal, "
+                "molho de tomate caseiro, milho e batata palha."
+            ),
+            [
+                ("Normal", TipoVariacao.normal, "22.00"),
+                ("Combo", TipoVariacao.combo, "32.00"),
+            ],
+            "dog-tradicional.jpeg",
+        ),
+        (
+            "Bixin",
+            "Pao de leite Ninho, salsicha Perdigao, molho de tomate caseiro e batata palha.",
+            [
+                ("Normal", TipoVariacao.normal, "12.00"),
+                ("Combo", TipoVariacao.combo, "22.00"),
+            ],
+            "dog-bixin.jpeg",
+        ),
+        (
+            "Bixin Duplo",
+            "Pao de leite Ninho, 2 salsichas Perdigao, molho de tomate caseiro e batata palha.",
+            [
+                ("Normal", TipoVariacao.normal, "17.00"),
+                ("Combo", TipoVariacao.combo, "27.00"),
+            ],
+            "dog-bixin.jpeg",
         ),
     ]
 
-    for nome, descricao, variacoes in produtos:
+    for nome, descricao, variacoes, imagem in produtos:
         criar_produto(
             db,
             subcategoria=subcategoria,
@@ -324,78 +373,110 @@ def seed_hot_dogs(db: Session, unidades: list[Unidade]) -> None:
             descricao=descricao,
             variacoes=variacoes,
             adicionais=adicionais_hot_dog(),
+            imagem_url=imagem_produto(imagem),
         )
 
 
 def seed_acompanhamentos(db: Session, unidades: list[Unidade]) -> None:
     """Cadastra acompanhamentos usados nos combos."""
-    subcategoria = criar_categoria_com_subcategoria(db, "Acompanhamentos", "Extras")
+    subcategoria = criar_categoria_com_subcategoria(db, "Acompanhamentos", "Acompanhamentos")
     acompanhamentos = [
-        ("Batata Chips", "8.00"),
-        ("Batata Chips G", "14.00"),
-        ("Brownie Tradicional", "8.00"),
-        ("Brownie Recheado", "10.00"),
+        (
+            "Paraiba Chips",
+            "Batata inglesa cortada em chips e frita no oleo de palma. 50g.",
+            "8.00",
+            "dog-bixin.jpeg",
+        ),
+        (
+            "Maionese Artesanal",
+            "Maionese caseira de alho, tradicional, ervas, apimentada ou bacon. Porcao 30g.",
+            "3.00",
+            "smash-facheiro.jpeg",
+        ),
     ]
-    for nome, preco in acompanhamentos:
+    for nome, descricao, preco, imagem in acompanhamentos:
         criar_produto(
             db,
             subcategoria=subcategoria,
             unidades=unidades,
             nome=nome,
-            descricao="Acompanhamento para pedido ou combo.",
+            descricao=descricao,
             variacoes=[("Unico", TipoVariacao.normal, preco)],
+            imagem_url=imagem_produto(imagem),
             pontos=0,
         )
 
 
 def seed_smashdogs(db: Session, unidades: list[Unidade]) -> None:
     """Cadastra o cardapio Paraiba Smashdog."""
-    subcategoria = criar_categoria_com_subcategoria(db, "Paraiba Smashdog", "Hamburgueres")
+    subcategoria = criar_categoria_com_subcategoria(db, "Smashdogs", "Smashdogs")
     produtos = [
         (
-            "FACHEIRO",
+            "Facheiro",
             "Pao brioche, blend artesanal 120g, mucarela e maionese.",
-            [
-                ("1 Carne", TipoVariacao.normal, "29.00"),
-                ("2 Carnes", TipoVariacao.normal, "36.00"),
-                ("3 Carnes", TipoVariacao.normal, "43.00"),
-                ("Combo 1 Carne", TipoVariacao.combo, "32.00"),
-                ("Combo 2 Carnes", TipoVariacao.combo, "39.00"),
-                ("Combo 3 Carnes", TipoVariacao.combo, "46.00"),
-                ("Combo 4 Carnes", TipoVariacao.combo, "53.00"),
-            ],
+            [("Normal", TipoVariacao.normal, "22.00")],
+            "smash-facheiro.jpeg",
         ),
         (
-            "MANDACARU",
-            "Pao brioche, blend artesanal 120g, mucarela, alface, tomate, cebola roxa e maionese.",
-            [
-                ("1 Carne", TipoVariacao.normal, "26.00"),
-                ("2 Carnes", TipoVariacao.normal, "33.00"),
-                ("3 Carnes", TipoVariacao.normal, "40.00"),
-                ("4 Carnes", TipoVariacao.normal, "47.00"),
-                ("Combo 1 Carne", TipoVariacao.combo, "36.00"),
-                ("Combo 2 Carnes", TipoVariacao.combo, "43.00"),
-                ("Combo 3 Carnes", TipoVariacao.combo, "50.00"),
-                ("Combo 4 Carnes", TipoVariacao.combo, "57.00"),
-            ],
+            "Mandacaru",
+            (
+                "Baguete de massa brioche, burger 120g, queijo mucarela, "
+                "alface americana, tomate e cebola roxa."
+            ),
+            [("Normal", TipoVariacao.normal, "25.00")],
+            "smash-mandacaru.jpeg",
         ),
         (
-            "XIQUE-XIQUE",
-            "Pao australiano, blend artesanal 120g, mucarela, bacon e maionese.",
-            [
-                ("1 Carne", TipoVariacao.normal, "27.00"),
-                ("2 Carnes", TipoVariacao.normal, "34.00"),
-                ("3 Carnes", TipoVariacao.normal, "41.00"),
-                ("4 Carnes", TipoVariacao.normal, "48.00"),
-                ("Combo 1 Carne", TipoVariacao.combo, "37.00"),
-                ("Combo 2 Carnes", TipoVariacao.combo, "44.00"),
-                ("Combo 3 Carnes", TipoVariacao.combo, "51.00"),
-                ("Combo 4 Carnes", TipoVariacao.combo, "58.00"),
-            ],
+            "Xique-Xique",
+            "Baguete em massa de pao australiano, burger 120g, queijo mucarela e bacon em tiras.",
+            [("Normal", TipoVariacao.normal, "27.00")],
+            "smash-xiquexique.jpeg",
+        ),
+        (
+            "Facheiro Duplo",
+            "Baguete em massa de brioche, burger 240g, queijo mucarela e maionese artesanal.",
+            [("Normal", TipoVariacao.normal, "29.00")],
+            "smash-facheiro.jpeg",
+        ),
+        (
+            "Mandacaru Duplo",
+            (
+                "Baguete de massa brioche, burger 240g, queijo mucarela, "
+                "alface americana, tomate e cebola roxa."
+            ),
+            [("Normal", TipoVariacao.normal, "33.00")],
+            "smash-mandacaru.jpeg",
+        ),
+        (
+            "Xique-Xique Duplo",
+            "Baguete em massa de pao australiano, burger 240g, queijo mucarela e bacon em tiras.",
+            [("Normal", TipoVariacao.normal, "35.00")],
+            "smash-xiquexique.jpeg",
+        ),
+        (
+            "Facheiro Triplo",
+            "Baguete em massa de brioche, burger 360g, queijo mucarela e maionese artesanal.",
+            [("Normal", TipoVariacao.normal, "36.00")],
+            "smash-facheiro.jpeg",
+        ),
+        (
+            "Mandacaru Triplo",
+            (
+                "Baguete de massa brioche, burger 360g, queijo mucarela, "
+                "alface americana, tomate e cebola roxa."
+            ),
+            [("Normal", TipoVariacao.normal, "40.00")],
+            "smash-mandacaru-triplo.jpeg",
+        ),
+        (
+            "Xique-Xique Triplo",
+            "Baguete em massa de pao australiano, burger 360g, queijo mucarela e bacon em tiras.",
+            [("Normal", TipoVariacao.normal, "42.00")],
+            "smash-xiquexique.jpeg",
         ),
     ]
 
-    for nome, descricao, variacoes in produtos:
+    for nome, descricao, variacoes, imagem in produtos:
         criar_produto(
             db,
             subcategoria=subcategoria,
@@ -404,6 +485,39 @@ def seed_smashdogs(db: Session, unidades: list[Unidade]) -> None:
             descricao=descricao,
             variacoes=variacoes,
             adicionais=adicionais_smashdog(),
+            imagem_url=imagem_produto(imagem),
+        )
+
+
+def seed_bebidas(db: Session, unidades: list[Unidade]) -> None:
+    """Cadastra as bebidas do cardapio publico."""
+    subcategoria = criar_categoria_com_subcategoria(db, "Bebidas", "Bebidas")
+    bebidas = [
+        (
+            "Refrigerante",
+            "Coca-Cola, Coca-Cola Zero, Guarana, Guarana Zero, Fanta Laranja e Sprite.",
+            "7.00",
+            "bedida-soda.jpeg",
+        ),
+        ("Sucos Integral", "Laranja e uva.", "9.00", "bedida-soda.jpeg"),
+        (
+            "Soda Italiana",
+            "Copo 400ml com gelo, 50ml de xarope, agua gaseificada 500ml e canudo.",
+            "10.00",
+            "bedida-soda.jpeg",
+        ),
+    ]
+    for nome, descricao, preco, imagem in bebidas:
+        criar_produto(
+            db,
+            subcategoria=subcategoria,
+            unidades=unidades,
+            nome=nome,
+            descricao=descricao,
+            variacoes=[("Normal", TipoVariacao.normal, preco)],
+            adicionais=adicionais_bebida(),
+            imagem_url=imagem_produto(imagem),
+            pontos=0,
         )
 
 
@@ -603,9 +717,10 @@ def run() -> None:
         criar_blog(db)
         clientes = criar_clientes(db)
         criar_usuario(db, unidades[0], permissoes)
-        seed_hot_dogs(db, unidades)
-        seed_acompanhamentos(db, unidades)
         seed_smashdogs(db, unidades)
+        seed_hot_dogs(db, unidades)
+        seed_bebidas(db, unidades)
+        seed_acompanhamentos(db, unidades)
         seed_pedidos_bi(db, unidades, clientes)
         db.commit()
     except Exception:
