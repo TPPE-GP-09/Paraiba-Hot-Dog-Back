@@ -16,6 +16,7 @@ from src.pedidos.model import (
 )
 from src.pedidos.schema import (
     AdicionarItensPedido,
+    AumentarQuantidadeItemPedido,
     AtualizarStatusCozinha,
     CancelarItemPedido,
     CancelarPedido,
@@ -75,6 +76,37 @@ def _validar_pedido_nao_cancelado(pedido: Pedido) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Pedido cancelado",
         )
+
+
+def _validar_pedido_nao_em_preparo(pedido: Pedido) -> None:
+    """Impede alteracoes depois que a cozinha inicia o preparo."""
+    if any(item.status == StatusItemPedido.preparando for item in pedido.itens):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pedido em preparo nao pode ser alterado",
+        )
+
+
+def _reabrir_pedido_pago(db: Session, pedido: Pedido) -> None:
+    """Estorna fidelidade e pagamento para permitir alteracoes em um pedido pago."""
+    if pedido.status != StatusPedido.pago:
+        return
+
+    cliente = db.get(Cliente, pedido.cliente_id) if pedido.cliente_id is not None else None
+    if cliente is not None and pedido.pontos_fidelidade_creditados:
+        pontos_creditados = sum(
+            item.quantidade * item.produto_variacao.produto.pontos_fidelidade_por_unidade
+            for item in pedido.itens
+            if item.status != StatusItemPedido.cancelado
+        )
+        cliente.pontos_fidelidade = max(cliente.pontos_fidelidade - pontos_creditados, 0)
+        pedido.pontos_fidelidade_creditados = False
+    if cliente is not None and pedido.pontos_fidelidade_utilizados:
+        cliente.pontos_fidelidade += pedido.pontos_fidelidade_utilizados
+
+    pedido.status = StatusPedido.aberto
+    pedido.forma_pagamento = None
+    pedido.fechado_em = None
 
 
 def _validar_cliente_unidade(db: Session, data: PedidoCreate) -> None:
@@ -208,9 +240,12 @@ def criar_pedido(db: Session, data: PedidoCreate) -> Pedido:
 
 
 def adicionar_itens(db: Session, pedido_id: int, data: AdicionarItensPedido) -> Pedido:
-    """Adiciona novos itens a um pedido aberto e recalcula os totais."""
+    """Adiciona itens e reabre o pedido pago quando a cozinha ainda permite alteracoes."""
     pedido = obter_pedido(db, pedido_id)
-    _validar_pedido_aberto(pedido)
+    _validar_pedido_nao_cancelado(pedido)
+    _validar_pedido_nao_em_preparo(pedido)
+    _reabrir_pedido_pago(db, pedido)
+
     proximo_lote = max((item.lote for item in pedido.itens), default=0) + 1
     for item_data in data.itens:
         pedido.itens.append(_criar_item(pedido, item_data, proximo_lote, db))
@@ -233,16 +268,38 @@ def _copiar_adicionais(item: ItemPedido) -> list[ItemPedidoAdicional]:
     ]
 
 
+def aumentar_quantidade_item(db: Session, item_id: int, data: AumentarQuantidadeItemPedido) -> Pedido:
+    """Aumenta a quantidade de um item enquanto a cozinha ainda nao iniciou o preparo."""
+    item = obter_item(db, item_id)
+    pedido = item.pedido
+    _validar_pedido_nao_cancelado(pedido)
+    _validar_pedido_nao_em_preparo(pedido)
+    if item.status != StatusItemPedido.aberto:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item nao pode ser alterado")
+
+    _reabrir_pedido_pago(db, pedido)
+    item.quantidade += data.quantidade
+    _recalcular_totais(pedido)
+    db.commit()
+    db.refresh(pedido)
+    return pedido
+
+
 def cancelar_item(db: Session, item_id: int, data: CancelarItemPedido) -> Pedido:
     """Cancela total ou parcialmente um item do pedido, registrando o motivo e recalculando totais."""
     item = obter_item(db, item_id)
     pedido = item.pedido
-    _validar_pedido_aberto(pedido)
+    _validar_pedido_nao_cancelado(pedido)
+    _validar_pedido_nao_em_preparo(pedido)
 
     if item.status == StatusItemPedido.entregue:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item entregue nao pode ser cancelado")
+    if item.status == StatusItemPedido.preparando:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item em preparo nao pode ser alterado")
     if item.status == StatusItemPedido.cancelado:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item ja cancelado")
+
+    _reabrir_pedido_pago(db, pedido)
 
     quantidade_cancelada = data.quantidade or item.quantidade
     if quantidade_cancelada > item.quantidade:
@@ -272,15 +329,30 @@ def cancelar_item(db: Session, item_id: int, data: CancelarItemPedido) -> Pedido
         db.add(item_cancelado)
 
     _recalcular_totais(pedido)
+    if not any(item_pedido.status != StatusItemPedido.cancelado for item_pedido in pedido.itens):
+        pedido.status = StatusPedido.cancelado
     db.commit()
     db.refresh(pedido)
     return pedido
 
 
 def cancelar_pedido(db: Session, pedido_id: int, data: CancelarPedido) -> Pedido:
-    """Cancela um pedido aberto, marcando todos os itens pendentes como cancelados."""
+    """Cancela um pedido nao cancelado, estornando fidelidade e pagamento quando necessario."""
     pedido = obter_pedido(db, pedido_id)
-    _validar_pedido_aberto(pedido)
+    _validar_pedido_nao_cancelado(pedido)
+
+    cliente = db.get(Cliente, pedido.cliente_id) if pedido.cliente_id is not None else None
+    if pedido.status == StatusPedido.pago and cliente is not None:
+        if pedido.pontos_fidelidade_creditados:
+            pontos_creditados = sum(
+                item.quantidade * item.produto_variacao.produto.pontos_fidelidade_por_unidade
+                for item in pedido.itens
+                if item.status != StatusItemPedido.cancelado
+            )
+            cliente.pontos_fidelidade = max(cliente.pontos_fidelidade - pontos_creditados, 0)
+            pedido.pontos_fidelidade_creditados = False
+        if pedido.pontos_fidelidade_utilizados:
+            cliente.pontos_fidelidade += pedido.pontos_fidelidade_utilizados
 
     for item in pedido.itens:
         if item.status in {StatusItemPedido.aberto, StatusItemPedido.preparando}:
@@ -288,8 +360,9 @@ def cancelar_pedido(db: Session, pedido_id: int, data: CancelarPedido) -> Pedido
             item.motivo_cancelamento = data.motivo_cancelamento
             item.cancelado_em = datetime.utcnow()
 
-    if not any(item.status == StatusItemPedido.entregue for item in pedido.itens):
-        pedido.status = StatusPedido.cancelado
+    pedido.status = StatusPedido.cancelado
+    pedido.forma_pagamento = None
+    pedido.fechado_em = None
 
     _recalcular_totais(pedido)
     db.commit()
