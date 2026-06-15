@@ -1,8 +1,11 @@
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette import status
 
 from src.bi.router import router as bi_router
 from src.auth.router import router as auth_router
@@ -22,6 +25,30 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Paraiba Hot Dog API")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+
+def _sanitize_validation_errors(value):
+    if isinstance(value, bytes):
+        return "<bytes>"
+    if isinstance(value, list):
+        return [_sanitize_validation_errors(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_validation_errors(item) for item in value)
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_validation_errors(item)
+            for key, item in value.items()
+        }
+    return value
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(_request, exc):
+    """Retorna erros de validacao sem tentar decodificar bytes de uploads."""
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": _sanitize_validation_errors(exc.errors())},
+    )
 
 app.add_middleware(
     CORSMiddleware,

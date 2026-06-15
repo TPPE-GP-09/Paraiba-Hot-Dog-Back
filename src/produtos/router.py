@@ -45,6 +45,7 @@ def _multipart_request_body(schema: type[BaseModel]) -> dict:
 
 
 CRIAR_PRODUTO_REQUEST_BODY = _multipart_request_body(ProdutoMultipartCreate)
+ATUALIZAR_PRODUTO_REQUEST_BODY = _multipart_request_body(ProdutoMultipartCreate)
 
 
 async def salvar_imagem_upload(imagem: UploadFile) -> str:
@@ -150,6 +151,38 @@ async def _produto_data_from_request(request: Request) -> ProdutoCreate:
             )
         if content_type == "application/json":
             return ProdutoCreate.model_validate(await request.json())
+        raise _unsupported_media_type()
+    except ValidationError as exc:
+        raise _erro_validacao(exc) from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="JSON invalido.",
+        ) from exc
+
+
+async def _produto_update_data_from_request(request: Request) -> ProdutoUpdate:
+    content_type = _content_type(request)
+    try:
+        if content_type == "multipart/form-data":
+            form = await request.form()
+            imagem = form.get("imagem")
+            unidade_ids = form.getlist("unidade_ids")
+            form_data = {
+                "nome": form.get("nome"),
+                "descricao": form.get("descricao"),
+                "ativo": _form_bool(form.get("ativo"), True),
+                "pontos_fidelidade_por_unidade": form.get("pontos_fidelidade_por_unidade", 0),
+                "disponivel_todas_unidades": _form_bool(form.get("disponivel_todas_unidades"), True),
+                "subcategoria_id": form.get("subcategoria_id"),
+                "unidade_ids": unidade_ids,
+            }
+            if _is_upload_file(imagem):
+                imagem_url = await salvar_imagem_upload(imagem)
+                form_data["imagem_url"] = imagem_url
+            return ProdutoUpdate.model_validate(form_data)
+        if content_type == "application/json":
+            return ProdutoUpdate.model_validate(await request.json())
         raise _unsupported_media_type()
     except ValidationError as exc:
         raise _erro_validacao(exc) from exc
@@ -427,18 +460,26 @@ async def criar_produto(
     "/{produto_id}",
     response_model=ProdutoRead,
     dependencies=[Depends(get_current_user)],
+    openapi_extra={"requestBody": ATUALIZAR_PRODUTO_REQUEST_BODY},
 )
-def atualizar_produto(
+async def atualizar_produto(
     produto_id: int,
-    data: ProdutoUpdate,
+    request: Request,
     db: Session = Depends(get_db),
 ) -> ProdutoRead:
     """Atualiza parcialmente um produto existente. Requer autenticacao."""
-    return repository.atualizar_produto(
-        db,
-        produto_id,
-        data,
-    )
+    imagem_anterior = repository.obter_produto(db, produto_id).imagem_url
+    produto = await _produto_update_data_from_request(request)
+    try:
+        produto_atualizado = repository.atualizar_produto(db, produto_id, produto)
+    except Exception:
+        _remover_imagem_url(produto.imagem_url)
+        raise
+
+    if produto.imagem_url:
+        _remover_imagem_url(imagem_anterior)
+
+    return produto_atualizado
 
 
 @router.delete(
