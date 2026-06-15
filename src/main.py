@@ -5,7 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.bi.router import router as bi_router
+from src.auth.router import router as auth_router
 from src.clientes.router import router as clientes_router
+from src.fidelidade.router import router as fidelidade_router
 from src.usuarios.router import router as usuarios_router
 from src.produtos.router import router as produtos_router
 from src.unidades.router import router as unidades_router
@@ -32,10 +34,20 @@ app.add_middleware(
 auth_dependencies = [Depends(get_current_user)]
 
 app.include_router(
+    auth_router,
+    prefix="/auth",
+    tags=["auth"],
+)
+app.include_router(
     clientes_router,
     prefix="/clientes",
     tags=["clientes"],
     dependencies=auth_dependencies,
+)
+app.include_router(
+    fidelidade_router,
+    prefix="/fidelidade",
+    tags=["fidelidade"],
 )
 app.include_router(
     usuarios_router,
