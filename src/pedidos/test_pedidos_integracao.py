@@ -196,7 +196,7 @@ def test_criar_pagar_e_manter_item_na_cozinha(cliente, cardapio_base):
 @pytest.mark.integration
 def test_resgate_fidelidade_aplica_desconto_e_debita_pontos_no_pagamento(cliente, cardapio_base):
     """Garante aplicacao e baixa de pontos no desconto fidelidade."""
-    cardapio_base["cliente"].pontos_fidelidade = 10
+    cardapio_base["cliente"].pontos_fidelidade = 12
 
     resposta_pedido = cliente.post(
         "/pedidos/",
@@ -220,7 +220,7 @@ def test_resgate_fidelidade_aplica_desconto_e_debita_pontos_no_pagamento(cliente
     assert pedido["subtotal"] == "19.90"
     assert pedido["desconto_fidelidade"] == "17.00"
     assert pedido["total"] == "2.90"
-    assert pedido["pontos_fidelidade_utilizados"] == 10
+    assert pedido["pontos_fidelidade_utilizados"] == 12
 
     resposta_pagamento = cliente.post(
         f"/pedidos/{pedido['id']}/finalizar",

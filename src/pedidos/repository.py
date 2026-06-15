@@ -30,7 +30,7 @@ from src.pedidos.schema import (
 from src.produtos.model import ProdutoAdicional, ProdutoVariacao
 from src.unidades.model import Unidade
 
-PONTOS_RESGATE_FIDELIDADE = 10
+PONTOS_RESGATE_FIDELIDADE = 12
 VALOR_DESCONTO_FIDELIDADE = Decimal("17.00")
 
 
