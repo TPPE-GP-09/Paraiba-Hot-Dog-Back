@@ -88,6 +88,10 @@ class CancelarItemPedido(BaseModel):
     quantidade: Optional[int] = Field(None, gt=0)
 
 
+class AumentarQuantidadeItemPedido(BaseModel):
+    quantidade: int = Field(default=1, gt=0)
+
+
 class CancelarPedido(BaseModel):
     motivo_cancelamento: str = Field(..., min_length=1)
 

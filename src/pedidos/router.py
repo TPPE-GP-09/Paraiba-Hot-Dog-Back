@@ -5,6 +5,7 @@ from src.database import get_db
 from src.pedidos import repository
 from src.pedidos.schema import (
     AdicionarItensPedido,
+    AumentarQuantidadeItemPedido,
     AtualizarStatusCozinha,
     CancelarItemPedido,
     CancelarPedido,
@@ -76,6 +77,16 @@ def cancelar_item(
 ) -> PedidoRead:
     """Cancela total ou parcialmente um item do pedido."""
     return repository.cancelar_item(db, item_id, data)
+
+
+@router.post("/itens/{item_id}/aumentar", response_model=PedidoRead)
+def aumentar_quantidade_item(
+    item_id: int,
+    data: AumentarQuantidadeItemPedido,
+    db: Session = Depends(get_db),
+) -> PedidoRead:
+    """Aumenta a quantidade de um item ainda nao preparado."""
+    return repository.aumentar_quantidade_item(db, item_id, data)
 
 
 @router.post("/{pedido_id}/cancelar", response_model=PedidoRead)
