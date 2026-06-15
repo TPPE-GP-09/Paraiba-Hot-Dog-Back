@@ -82,8 +82,14 @@ class TestClientes:
         assert response.status_code == 200
         assert response.json() == []
 
-    def test_criar_cliente(self, override_get_db):
+    def test_criar_cliente(self, override_get_db, monkeypatch):
         """Testa criacao de cliente com telefone sanitizado."""
+        envios = []
+
+        def fake_whatsapp(nome, telefone):
+            envios.append(("whatsapp", nome, telefone))
+
+        monkeypatch.setattr("src.clientes.router.enviar_boas_vindas", fake_whatsapp)
         payload = {
             "nome": "Joao Gabriel",
             "telefone": "(61) 9856-12117",
@@ -98,6 +104,7 @@ class TestClientes:
         assert data["email"] == "joaogabriel@gmail.com"
         assert data["pontos_fidelidade"] == 1
         assert "data_cadastro" in data
+        assert ("whatsapp", "Joao Gabriel", "61985612117") in envios
 
     def test_listar_clientes_com_filtro(self, override_get_db, cliente_valido):
         """Testa listagem com filtro por telefone."""

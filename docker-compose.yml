@@ -15,6 +15,16 @@ services:
       TWILIO_API_KEY_SID: ${TWILIO_API_KEY_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       TWILIO_WHATSAPP_FROM: ${TWILIO_WHATSAPP_FROM:-whatsapp:+14155238886}
+      SMTP_RECUPERACAO_SENHA_HOST: ${SMTP_RECUPERACAO_SENHA_HOST:-mailhog}
+      SMTP_RECUPERACAO_SENHA_PORT: ${SMTP_RECUPERACAO_SENHA_PORT:-1025}
+      SMTP_RECUPERACAO_SENHA_USERNAME: ${SMTP_RECUPERACAO_SENHA_USERNAME:-}
+      SMTP_RECUPERACAO_SENHA_PASSWORD: ${SMTP_RECUPERACAO_SENHA_PASSWORD:-}
+      SMTP_RECUPERACAO_SENHA_FROM_EMAIL: ${SMTP_RECUPERACAO_SENHA_FROM_EMAIL:-recuperacao@paraibahotdog.local}
+      SMTP_RECUPERACAO_SENHA_FROM_NAME: ${SMTP_RECUPERACAO_SENHA_FROM_NAME:-Paraiba Hot Dog}
+      SMTP_RECUPERACAO_SENHA_STARTTLS: ${SMTP_RECUPERACAO_SENHA_STARTTLS:-false}
+      SMTP_RECUPERACAO_SENHA_SSL: ${SMTP_RECUPERACAO_SENHA_SSL:-false}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+      RESET_SENHA_TOKEN_MINUTOS: ${RESET_SENHA_TOKEN_MINUTOS:-30}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-paraiba-hotdog}
       KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/paraiba-hotdog}
       KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-http://keycloak:8080/realms/paraiba-hotdog/protocol/openid-connect/certs}
@@ -27,6 +37,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailhog:
+        condition: service_started
 
   postgres:
     image: postgres:18.3
@@ -52,3 +64,9 @@ services:
     volumes:
       - ./keycloak:/opt/keycloak/data/import
     command: ["start-dev", "--import-realm"]
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - "1025:1025"
+      - "8025:8025"

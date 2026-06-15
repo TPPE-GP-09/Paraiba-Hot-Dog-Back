@@ -16,6 +16,7 @@ from src.database import Base  # noqa: E402
 import src.permissoes.model  # noqa: F401,E402
 import src.unidades.model  # noqa: F401,E402
 import src.usuarios.model  # noqa: F401,E402
+import src.auth.model  # noqa: F401,E402
 import src.clientes.model  # noqa: F401,E402
 import src.produtos.model  # noqa: F401,E402
 import src.blog.model  # noqa: F401,E402

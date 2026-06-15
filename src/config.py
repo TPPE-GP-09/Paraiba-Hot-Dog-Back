@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     twilio_api_key_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_from: str = "whatsapp:+14155238886"
+    smtp_recuperacao_senha_host: str = ""
+    smtp_recuperacao_senha_port: int = 587
+    smtp_recuperacao_senha_username: str = ""
+    smtp_recuperacao_senha_password: str = ""
+    smtp_recuperacao_senha_from_email: str = ""
+    smtp_recuperacao_senha_from_name: str = "Paraiba Hot Dog"
+    smtp_recuperacao_senha_starttls: bool = True
+    smtp_recuperacao_senha_ssl: bool = False
     keycloak_realm: str = "paraiba-hotdog"
     keycloak_issuer: str = "http://localhost:8080/realms/paraiba-hotdog"
     keycloak_jwks_url: str = (
@@ -26,6 +34,8 @@ class Settings(BaseSettings):
     keycloak_admin_username: str = "admin"
     keycloak_admin_password: str = "admin"
     keycloak_user_sync_enabled: bool = True
+    frontend_base_url: str = "http://localhost:5173"
+    reset_senha_token_minutos: int = 30
 
 
 settings = Settings()
