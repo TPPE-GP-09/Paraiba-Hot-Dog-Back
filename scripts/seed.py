@@ -57,6 +57,7 @@ def criar_unidades(db: Session) -> list[Unidade]:
             "abertura": time(18, 0),
             "fechamento": time(23, 0),
             "descricao": "Unidade da Avenida Jequitiba em Aguas Claras.",
+            "imagem": "/uploads/unidades/unidade-jequitiba.jpeg",
             "endereco": {
                 "cep": "70297400",
                 "logradouro": "Av. Jequitiba Praca Tangara",
@@ -72,6 +73,7 @@ def criar_unidades(db: Session) -> list[Unidade]:
             "abertura": time(17, 0),
             "fechamento": time(23, 0),
             "descricao": "Unidade da Avenida das Araucarias em Aguas Claras.",
+            "imagem": "/uploads/unidades/unidade-araucarias.jpeg",
             "endereco": {
                 "cep": "70297400",
                 "logradouro": "Av. das Araucarias",
@@ -87,7 +89,7 @@ def criar_unidades(db: Session) -> list[Unidade]:
     unidades = []
     for dados in dados_unidades:
         endereco = Endereco(**dados.pop("endereco"))
-        unidade = Unidade(**dados, imagem=None, endereco=endereco)
+        unidade = Unidade(**dados, endereco=endereco)
         db.add(unidade)
         unidades.append(unidade)
 

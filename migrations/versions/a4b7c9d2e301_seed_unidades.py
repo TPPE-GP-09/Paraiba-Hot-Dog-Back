@@ -21,43 +21,32 @@ def upgrade() -> None:
 
     unidades = [
         {
-            "nome": "Unidade Asa Sul",
-            "cep": "70390025",
-            "logradouro": "CLS 308",
-            "numero": "12",
-            "complemento": "Loja 4",
-            "bairro": "Asa Sul",
-            "cidade": "Brasilia",
-            "estado": "DF",
-            "abertura": "11:00",
-            "fechamento": "23:00",
-            "descricao": "Unidade de atendimento na Asa Sul",
-        },
-        {
-            "nome": "Unidade Aguas Claras",
-            "cep": "71900000",
-            "logradouro": "Avenida das Castanheiras",
-            "numero": "500",
-            "complemento": "Quiosque 2",
+            "nome": "Unidade Aguas Claras (Avenida Jequitiba)",
+            "cep": "70297400",
+            "logradouro": "Av. Jequitiba Praca Tangara",
+            "numero": None,
+            "complemento": None,
             "bairro": "Aguas Claras",
             "cidade": "Brasilia",
             "estado": "DF",
-            "abertura": "11:00",
+            "abertura": "18:00",
             "fechamento": "23:00",
-            "descricao": "Unidade de atendimento em Aguas Claras",
+            "descricao": "Unidade da Avenida Jequitiba em Aguas Claras.",
+            "imagem": "/uploads/unidades/unidade-jequitiba.jpeg",
         },
         {
-            "nome": "Unidade Taguatinga",
-            "cep": "72010010",
-            "logradouro": "Avenida Comercial Norte",
-            "numero": "150",
+            "nome": "Unidade Aguas Claras (Avenida das Araucarias)",
+            "cep": "70297400",
+            "logradouro": "Av. das Araucarias",
+            "numero": "1395",
             "complemento": None,
-            "bairro": "Taguatinga Norte",
+            "bairro": "Aguas Claras",
             "cidade": "Brasilia",
             "estado": "DF",
-            "abertura": "10:30",
-            "fechamento": "22:30",
-            "descricao": "Unidade de atendimento em Taguatinga",
+            "abertura": "17:00",
+            "fechamento": "23:00",
+            "descricao": "Unidade da Avenida das Araucarias em Aguas Claras.",
+            "imagem": "/uploads/unidades/unidade-araucarias.jpeg",
         },
     ]
 
@@ -86,9 +75,9 @@ def upgrade() -> None:
             sa.text(
                 """
                 INSERT INTO unidades
-                    (nome, abertura, fechamento, descricao, endereco_id)
+                    (nome, abertura, fechamento, descricao, imagem, endereco_id)
                 VALUES
-                    (:nome, :abertura, :fechamento, :descricao, :endereco_id)
+                    (:nome, :abertura, :fechamento, :descricao, :imagem, :endereco_id)
                 """
             ),
             {**unidade, "endereco_id": endereco_id},
@@ -97,7 +86,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    nomes = ["Unidade Asa Sul", "Unidade Aguas Claras", "Unidade Taguatinga"]
+    nomes = ["Unidade Aguas Claras (Avenida Jequitiba)", "Unidade Aguas Claras (Avenida das Araucarias)"]
     endereco_ids = [
         row[0]
         for row in conn.execute(
