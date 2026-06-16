@@ -329,7 +329,9 @@ def test_produtos_erros_de_validacao_e_integridade(monkeypatch):
 
     with pytest.raises(HTTPException) as exc_info:
         repository.excluir_produto(db, 1)
-    assert exc_info.value.detail == "Erro ao excluir produto"
+    assert exc_info.value.detail == (
+        "Produto possui pedidos vinculados e nao pode ser excluido"
+    )
 
 
 def test_listar_produtos_com_query_fake():

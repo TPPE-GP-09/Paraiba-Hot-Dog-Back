@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import Depends, FastAPI
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,7 +48,11 @@ async def request_validation_exception_handler(_request, exc):
     """Retorna erros de validacao sem tentar decodificar bytes de uploads."""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": _sanitize_validation_errors(exc.errors())},
+        content={
+            "detail": jsonable_encoder(
+                _sanitize_validation_errors(exc.errors())
+            )
+        },
     )
 
 app.add_middleware(
