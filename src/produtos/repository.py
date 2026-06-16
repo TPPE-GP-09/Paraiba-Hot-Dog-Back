@@ -354,7 +354,7 @@ def excluir_produto(db: Session, produto_id: int) -> None:
 
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Erro ao excluir produto",
+            detail="Produto possui pedidos vinculados e nao pode ser excluido",
         ) from None
 
 

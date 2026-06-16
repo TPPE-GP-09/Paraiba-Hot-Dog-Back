@@ -182,6 +182,45 @@ def test_criar_produto_remove_imagem_quando_repository_falha(tmp_path, monkeypat
     assert not list(upload_dir.iterdir())
 
 
+def test_atualizar_produto_multipart_troca_imagem(tmp_path, monkeypatch, db_session):
+    """Garante que edicao multipart persiste a nova imagem e remove a antiga."""
+    db, subcategoria = db_session
+    upload_dir = tmp_path / "uploads" / "produtos"
+    upload_dir.mkdir(parents=True)
+    monkeypatch.setattr(produtos_router, "UPLOAD_DIR", upload_dir)
+    imagem_antiga = upload_dir / "antiga.jpg"
+    imagem_antiga.write_bytes(b"old image")
+    produto = Produto(
+        nome="Hot dog simples",
+        descricao="Classico",
+        imagem_url="/uploads/produtos/antiga.jpg",
+        subcategoria_id=subcategoria.id,
+    )
+    db.add(produto)
+    db.commit()
+    db.refresh(produto)
+    request = FakeRequest(
+        "multipart/form-data",
+        {
+            "nome": "Hot dog simples atualizado",
+            "subcategoria_id": str(subcategoria.id),
+            "descricao": "Classico",
+            "ativo": "true",
+            "pontos_fidelidade_por_unidade": "0",
+            "disponivel_todas_unidades": "true",
+            "imagem": FakeUploadFile("nova.jpg", "image/jpeg", b"new image"),
+        },
+    )
+
+    atualizado = asyncio.run(produtos_router.atualizar_produto(produto.id, request, db))
+
+    assert atualizado.imagem_url != "/uploads/produtos/antiga.jpg"
+    assert atualizado.imagem_url.startswith("/uploads/produtos/")
+    assert db.get(Produto, produto.id).imagem_url == atualizado.imagem_url
+    assert not imagem_antiga.exists()
+    assert len(list(upload_dir.iterdir())) == 1
+
+
 def test_criar_produto_content_type_invalido_retorna_415(db_session):
     """Garante erro controlado para content type nao suportado."""
     db, _subcategoria = db_session
