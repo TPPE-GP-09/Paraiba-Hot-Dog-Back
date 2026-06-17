@@ -416,7 +416,10 @@ def seed_smashdogs(db: Session, unidades: list[Unidade]) -> None:
         (
             "Facheiro",
             "Pao brioche, blend artesanal 120g, mucarela e maionese.",
-            [("Normal", TipoVariacao.normal, "22.00")],
+            [
+                ("Normal", TipoVariacao.normal, "22.00"),
+                ("Combo", TipoVariacao.combo, "35.00"),
+            ],
             "smash-facheiro.jpeg",
         ),
         (
@@ -425,19 +428,28 @@ def seed_smashdogs(db: Session, unidades: list[Unidade]) -> None:
                 "Baguete de massa brioche, burger 120g, queijo mucarela, "
                 "alface americana, tomate e cebola roxa."
             ),
-            [("Normal", TipoVariacao.normal, "25.00")],
+            [
+                ("Normal", TipoVariacao.normal, "25.00"),
+                ("Combo", TipoVariacao.combo, "38.00"),
+            ],
             "smash-mandacaru.jpeg",
         ),
         (
             "Xique-Xique",
             "Baguete em massa de pao australiano, burger 120g, queijo mucarela e bacon em tiras.",
-            [("Normal", TipoVariacao.normal, "27.00")],
+            [
+                ("Normal", TipoVariacao.normal, "27.00"),
+                ("Combo", TipoVariacao.combo, "40.00"),
+            ],
             "smash-xiquexique.jpeg",
         ),
         (
             "Facheiro Duplo",
             "Baguete em massa de brioche, burger 240g, queijo mucarela e maionese artesanal.",
-            [("Normal", TipoVariacao.normal, "29.00")],
+            [
+                ("Normal", TipoVariacao.normal, "29.00"),
+                ("Combo", TipoVariacao.combo, "42.00"),
+            ],
             "smash-facheiro.jpeg",
         ),
         (
@@ -446,19 +458,28 @@ def seed_smashdogs(db: Session, unidades: list[Unidade]) -> None:
                 "Baguete de massa brioche, burger 240g, queijo mucarela, "
                 "alface americana, tomate e cebola roxa."
             ),
-            [("Normal", TipoVariacao.normal, "33.00")],
+            [
+                ("Normal", TipoVariacao.normal, "33.00"),
+                ("Combo", TipoVariacao.combo, "46.00"),
+            ],
             "smash-mandacaru.jpeg",
         ),
         (
             "Xique-Xique Duplo",
             "Baguete em massa de pao australiano, burger 240g, queijo mucarela e bacon em tiras.",
-            [("Normal", TipoVariacao.normal, "35.00")],
+            [
+                ("Normal", TipoVariacao.normal, "35.00"),
+                ("Combo", TipoVariacao.combo, "48.00"),
+            ],
             "smash-xiquexique.jpeg",
         ),
         (
             "Facheiro Triplo",
             "Baguete em massa de brioche, burger 360g, queijo mucarela e maionese artesanal.",
-            [("Normal", TipoVariacao.normal, "36.00")],
+            [
+                ("Normal", TipoVariacao.normal, "36.00"),
+                ("Combo", TipoVariacao.combo, "49.00"),
+            ],
             "smash-facheiro.jpeg",
         ),
         (
@@ -467,13 +488,19 @@ def seed_smashdogs(db: Session, unidades: list[Unidade]) -> None:
                 "Baguete de massa brioche, burger 360g, queijo mucarela, "
                 "alface americana, tomate e cebola roxa."
             ),
-            [("Normal", TipoVariacao.normal, "40.00")],
+            [
+                ("Normal", TipoVariacao.normal, "40.00"),
+                ("Combo", TipoVariacao.combo, "53.00"),
+            ],
             "smash-mandacaru-triplo.jpeg",
         ),
         (
             "Xique-Xique Triplo",
             "Baguete em massa de pao australiano, burger 360g, queijo mucarela e bacon em tiras.",
-            [("Normal", TipoVariacao.normal, "42.00")],
+            [
+                ("Normal", TipoVariacao.normal, "42.00"),
+                ("Combo", TipoVariacao.combo, "55.00"),
+            ],
             "smash-xiquexique.jpeg",
         ),
     ]

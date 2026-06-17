@@ -18,6 +18,7 @@ from src.unidades.router import router as unidades_router
 from src.permissoes.router import router as permissoes_router
 from src.blog.router import router as blog_router
 from src.pedidos.router import router as pedidos_router
+from src.config import settings
 from src.security import get_current_user
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -57,6 +58,7 @@ async def request_validation_exception_handler(_request, exc):
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],

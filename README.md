@@ -79,6 +79,17 @@ Serviços disponíveis após subir:
 | Documentação Redoc | http://localhost:8000/redoc |
 | PostgreSQL | localhost:5432 |
 
+## Deploy no Render
+
+O arquivo `render.yaml` cria a API Docker e um Postgres gerenciado no Render.
+
+1. Crie um novo Blueprint no Render apontando para este repositório.
+2. Depois que o frontend estiver no Netlify, ajuste `FRONTEND_BASE_URL` e `CORS_ORIGINS` para a URL real do site, por exemplo `https://seu-site.netlify.app`.
+3. Preencha no painel do Render as variáveis marcadas como secretas (`sync: false`), como Twilio e SMTP.
+4. O container executa `alembic upgrade head` antes de iniciar o Uvicorn.
+
+Se usar Keycloak em produção, configure também `KEYCLOAK_ISSUER`, `KEYCLOAK_JWKS_URL`, `KEYCLOAK_ADMIN_BASE_URL`, `KEYCLOAK_ADMIN_USERNAME` e `KEYCLOAK_ADMIN_PASSWORD`; caso contrário, mantenha `KEYCLOAK_USER_SYNC_ENABLED=false`.
+
 Para parar os serviços:
 
 ```bash
