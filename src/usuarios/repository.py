@@ -84,25 +84,40 @@ def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario
     """Atualiza os campos fornecidos de um usuario e propaga as alteracoes ao Keycloak."""
     usuario = get_usuario(db, usuario_id)
     update_data = data.model_dump(exclude_unset=True)
+    keycloak_user_created = False
     if "unidade_id" in update_data:
         _validar_unidade(db, update_data["unidade_id"])
     if "permissao_ids" in update_data:
         usuario.permissoes = _resolver_permissoes(db, update_data.pop("permissao_ids"))
+    senha = update_data.pop("senha", None)
     keycloak_update = {
         "nome": update_data.get("nome"),
         "email": str(update_data["email"]) if "email" in update_data else None,
-        "senha": update_data.pop("senha", None),
+        "senha": senha,
         "nome_role": update_data["funcao"].value if "funcao" in update_data else None,
     }
     for field, value in update_data.items():
         setattr(usuario, field, value)
+
+    if usuario.keycloak_id:
+        update_keycloak_user(usuario.keycloak_id, **keycloak_update)
+    elif senha:
+        keycloak_id, keycloak_user_created = create_keycloak_user(
+            nome=usuario.nome,
+            email=str(usuario.email),
+            senha=senha,
+            nome_role=usuario.funcao.value,
+        )
+        usuario.keycloak_id = keycloak_id
+
     try:
         db.commit()
     except IntegrityError as e:
         db.rollback()
+        if keycloak_user_created:
+            delete_keycloak_user(usuario.keycloak_id)
         raise _tratar_integridade(e) from e
     db.refresh(usuario)
-    update_keycloak_user(usuario.keycloak_id, **keycloak_update)
     return usuario
 
 
