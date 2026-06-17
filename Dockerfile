@@ -1,15 +1,5 @@
-FROM python:3.14-slim
+FROM quay.io/keycloak/keycloak:22.0.1
 
-WORKDIR /app
+COPY paraiba-hotdog-realm.json /opt/keycloak/data/import/paraiba-hotdog-realm.json
 
-RUN pip install --no-cache-dir --root-user-action=ignore poetry==2.1.2
-
-COPY pyproject.toml poetry.lock README.md ./
-
-RUN poetry config virtualenvs.create false && poetry install --without dev --no-root --no-interaction --no-ansi
-
-COPY . .
-
-EXPOSE 8000
-
-CMD ["sh", "-c", "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "start-dev --import-realm --http-host=0.0.0.0 --http-port=${PORT:-8080}"]
