@@ -67,6 +67,8 @@ def solicitar_recuperacao_senha(db: Session, email: str) -> dict:
     return {
         "message": MENSAGEM_RECUPERACAO,
         "email_status": resultado.get("status", "unknown"),
+        "email_reason": resultado.get("reason"),
+        "email_detail": resultado.get("detail"),
     }
 
 

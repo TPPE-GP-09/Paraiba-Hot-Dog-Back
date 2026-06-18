@@ -59,7 +59,7 @@ def _enviar_email(config: SmtpConfig, destino: str, assunto: str, corpo: str) ->
 
     try:
         smtp_cls = smtplib.SMTP_SSL if config.ssl else smtplib.SMTP
-        with smtp_cls(config.host, config.port, timeout=10) as smtp:
+        with smtp_cls(config.host, config.port, timeout=30) as smtp:
             if config.starttls and not config.ssl:
                 smtp.starttls()
             if config.username:
@@ -69,10 +69,10 @@ def _enviar_email(config: SmtpConfig, destino: str, assunto: str, corpo: str) ->
         return {"status": "sent"}
     except smtplib.SMTPException as exc:
         logger.exception("Falha SMTP ao enviar e-mail para destino=%s: %s", destino, exc)
-        return {"status": "error", "reason": "smtp_exception"}
+        return {"status": "error", "reason": "smtp_exception", "detail": str(exc)}
     except OSError as exc:
         logger.exception("Falha de rede ao enviar e-mail para destino=%s: %s", destino, exc)
-        return {"status": "error", "reason": "network_exception"}
+        return {"status": "error", "reason": "network_exception", "detail": str(exc)}
 
 
 def enviar_recuperacao_senha(email: str, link_recuperacao: str) -> dict:

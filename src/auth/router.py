@@ -15,6 +15,8 @@ class EsqueciSenhaRequest(BaseModel):
 class EsqueciSenhaResponse(BaseModel):
     message: str
     email_status: str
+    email_reason: str | None = None
+    email_detail: str | None = None
 
 
 class RedefinirSenhaRequest(BaseModel):
@@ -36,6 +38,8 @@ def esqueci_senha(
     return EsqueciSenhaResponse(
         message=resultado["message"],
         email_status=resultado["email_status"],
+        email_reason=resultado.get("email_reason"),
+        email_detail=resultado.get("email_detail"),
     )
 
 
