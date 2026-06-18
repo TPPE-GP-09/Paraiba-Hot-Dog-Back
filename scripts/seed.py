@@ -26,6 +26,7 @@ from src.produtos.model import (
     Subcategoria,
     TipoVariacao,
 )
+from src.keycloak_admin import create_keycloak_user
 from src.unidades.model import Endereco, Unidade
 from src.usuarios.model import FuncaoUsuario, Usuario
 
@@ -147,20 +148,47 @@ def criar_clientes(db: Session) -> list[Cliente]:
     return clientes
 
 
-def criar_usuario(db: Session, unidade: Unidade, permissoes: list[Permissao]) -> Usuario:
-    """Cadastra um usuario administrador local para testes manuais."""
-    usuario = Usuario(
-        nome="Administrador Paraiba Hot Dog",
-        email="admin.paraiba@example.com",
-        senha=None,
-        funcao=FuncaoUsuario.administrador,
-        unidade_id=unidade.id,
-        keycloak_id=None,
-    )
-    usuario.permissoes = permissoes
-    db.add(usuario)
+def criar_usuarios(db: Session, unidade: Unidade, permissoes: list[Permissao]) -> list[Usuario]:
+    """Cadastra usuarios iniciais e sincroniza com Keycloak quando habilitado."""
+    dados_usuarios = [
+        {
+            "nome": "Daniel Ferreira",
+            "email": "danielferreiranunes2003@gmail.com",
+            "senha": "Paraiba@2026",
+            "funcao": FuncaoUsuario.administrador,
+            "permissoes": permissoes,
+        },
+        {
+            "nome": "Administrador Paraiba Hot Dog",
+            "email": "admin.paraiba@example.com",
+            "senha": "Admin@2026",
+            "funcao": FuncaoUsuario.administrador,
+            "permissoes": permissoes,
+        },
+    ]
+
+    usuarios = []
+    for dados in dados_usuarios:
+        keycloak_id, _ = create_keycloak_user(
+            nome=dados["nome"],
+            email=dados["email"],
+            senha=dados["senha"],
+            nome_role=dados["funcao"].value,
+        )
+        usuario = Usuario(
+            nome=dados["nome"],
+            email=dados["email"],
+            senha=None,
+            funcao=dados["funcao"],
+            unidade_id=unidade.id,
+            keycloak_id=keycloak_id,
+        )
+        usuario.permissoes = dados["permissoes"]
+        db.add(usuario)
+        usuarios.append(usuario)
+
     db.flush()
-    return usuario
+    return usuarios
 
 
 def criar_categoria_com_subcategoria(db: Session, categoria_nome: str, subcategoria_nome: str) -> Subcategoria:
@@ -745,7 +773,7 @@ def run() -> None:
         unidades = criar_unidades(db)
         criar_blog(db)
         clientes = criar_clientes(db)
-        criar_usuario(db, unidades[0], permissoes)
+        criar_usuarios(db, unidades[0], permissoes)
         seed_smashdogs(db, unidades)
         seed_hot_dogs(db, unidades)
         seed_bebidas(db, unidades)
