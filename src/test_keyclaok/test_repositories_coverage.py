@@ -226,6 +226,37 @@ def test_list_get_update_delete_usuario(monkeypatch):
     delete_mock.assert_called_once_with("kc-1")
 
 
+def test_update_usuario_recria_keycloak_quando_id_antigo(monkeypatch):
+    """Recria vinculo no Keycloak quando o ID salvo nao existe mais."""
+    item = usuario()
+    db = Mock()
+    db.get.return_value = item
+    update_mock = Mock(
+        side_effect=HTTPException(
+            status_code=502,
+            detail="Falha ao consultar o Keycloak: HTTP 404",
+        )
+    )
+    create_mock = Mock(return_value=("kc-novo", False))
+    monkeypatch.setattr(usuarios_repository, "update_keycloak_user", update_mock)
+    monkeypatch.setattr(usuarios_repository, "create_keycloak_user", create_mock)
+
+    atualizado = usuarios_repository.update_usuario(
+        db,
+        1,
+        UsuarioUpdate(email="novo@example.com", senha="nova-senha"),
+    )
+
+    assert atualizado.keycloak_id == "kc-novo"
+    create_mock.assert_called_once_with(
+        nome="Usuario Teste",
+        email="novo@example.com",
+        senha="nova-senha",
+        nome_role="caixa",
+    )
+    db.commit.assert_called_once()
+
+
 def test_update_usuario_valida_unidade_permissoes_e_integridade(monkeypatch):
     """Valida update de usuario com permissoes e rollback em erro."""
     item = usuario()

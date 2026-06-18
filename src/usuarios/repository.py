@@ -100,7 +100,19 @@ def update_usuario(db: Session, usuario_id: int, data: UsuarioUpdate) -> Usuario
         setattr(usuario, field, value)
 
     if usuario.keycloak_id:
-        update_keycloak_user(usuario.keycloak_id, **keycloak_update)
+        try:
+            update_keycloak_user(usuario.keycloak_id, **keycloak_update)
+        except HTTPException as exc:
+            keycloak_usuario_ausente = "HTTP 404" in str(exc.detail)
+            if not senha or not keycloak_usuario_ausente:
+                raise
+            keycloak_id, keycloak_user_created = create_keycloak_user(
+                nome=usuario.nome,
+                email=str(usuario.email),
+                senha=senha,
+                nome_role=usuario.funcao.value,
+            )
+            usuario.keycloak_id = keycloak_id
     elif senha:
         keycloak_id, keycloak_user_created = create_keycloak_user(
             nome=usuario.nome,
