@@ -20,6 +20,8 @@ services:
         value: paraiba-hotdog-api
       - key: KEYCLOAK_USER_SYNC_ENABLED
         value: "false"
+      - key: SEED_SECRET_KEY
+        sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_API_KEY_SID

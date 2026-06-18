@@ -10,6 +10,7 @@ from starlette import status
 
 from src.bi.router import router as bi_router
 from src.auth.router import router as auth_router
+from src.seed_router import router as seed_router
 from src.clientes.router import router as clientes_router
 from src.fidelidade.router import router as fidelidade_router
 from src.usuarios.router import router as usuarios_router
@@ -72,6 +73,7 @@ app.include_router(
     prefix="/auth",
     tags=["auth"],
 )
+app.include_router(seed_router, tags=["seed"])
 app.include_router(
     clientes_router,
     prefix="/clientes",

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     keycloak_user_sync_enabled: bool = True
     frontend_base_url: str = "http://localhost:5173"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    seed_secret_key: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
