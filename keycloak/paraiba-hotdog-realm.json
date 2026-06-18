@@ -57,6 +57,24 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "admin.paraiba@gmail.com",
+      "email": "admin.paraiba@gmail.com",
+      "firstName": "Administrador",
+      "lastName": "Paraiba Hot Dog",
+      "emailVerified": true,
+      "enabled": true,
+      "realmRoles": [
+        "administrador"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "paraiba",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

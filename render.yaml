@@ -28,22 +28,6 @@ services:
         sync: false
       - key: TWILIO_WHATSAPP_FROM
         sync: false
-      - key: SMTP_RECUPERACAO_SENHA_HOST
-        sync: false
-      - key: SMTP_RECUPERACAO_SENHA_PORT
-        value: "587"
-      - key: SMTP_RECUPERACAO_SENHA_USERNAME
-        sync: false
-      - key: SMTP_RECUPERACAO_SENHA_PASSWORD
-        sync: false
-      - key: SMTP_RECUPERACAO_SENHA_FROM_EMAIL
-        sync: false
-      - key: SMTP_RECUPERACAO_SENHA_FROM_NAME
-        value: Paraiba Hot Dog
-      - key: SMTP_RECUPERACAO_SENHA_STARTTLS
-        value: "true"
-      - key: SMTP_RECUPERACAO_SENHA_SSL
-        value: "false"
 
 databases:
   - name: paraiba-hot-dog-db
