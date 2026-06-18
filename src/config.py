@@ -40,11 +40,15 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [
+        origins = [
             origin.strip().rstrip("/")
             for origin in self.cors_origins.split(",")
             if origin.strip()
         ]
+        frontend_origin = self.frontend_base_url.strip().rstrip("/")
+        if frontend_origin:
+            origins.append(frontend_origin)
+        return list(dict.fromkeys(origins))
 
 
 settings = Settings()
