@@ -90,6 +90,23 @@ O arquivo `render.yaml` cria a API Docker e um Postgres gerenciado no Render.
 
 Se usar Keycloak em produção, configure também `KEYCLOAK_ISSUER`, `KEYCLOAK_JWKS_URL`, `KEYCLOAK_ADMIN_BASE_URL`, `KEYCLOAK_ADMIN_USERNAME` e `KEYCLOAK_ADMIN_PASSWORD`; caso contrário, mantenha `KEYCLOAK_USER_SYNC_ENABLED=false`.
 
+### SMTP para recuperação de senha
+
+O fluxo de "esqueci minha senha" envia o link diretamente para o e-mail do usuário usando SMTP real. Em produção, configure estas variáveis no Render:
+
+```env
+SMTP_RECUPERACAO_SENHA_HOST=smtp.gmail.com
+SMTP_RECUPERACAO_SENHA_PORT=587
+SMTP_RECUPERACAO_SENHA_USERNAME=seu-email@gmail.com
+SMTP_RECUPERACAO_SENHA_PASSWORD=sua-senha-de-app
+SMTP_RECUPERACAO_SENHA_FROM_EMAIL=seu-email@gmail.com
+SMTP_RECUPERACAO_SENHA_FROM_NAME=Paraiba Hot Dog
+SMTP_RECUPERACAO_SENHA_STARTTLS=true
+SMTP_RECUPERACAO_SENHA_SSL=false
+```
+
+Para Gmail, use uma senha de app, nao a senha normal da conta. Se usar outro provedor, mantenha os valores de host, porta e seguranca conforme a documentacao dele.
+
 Para parar os serviços:
 
 ```bash
