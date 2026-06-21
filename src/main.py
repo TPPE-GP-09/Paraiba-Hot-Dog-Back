@@ -19,6 +19,7 @@ from src.unidades.router import router as unidades_router
 from src.permissoes.router import router as permissoes_router
 from src.blog.router import router as blog_router
 from src.pedidos.router import router as pedidos_router
+from src.pedidos.sse_router import router as pedidos_sse_router
 from src.config import settings
 from src.security import get_current_user
 
@@ -117,6 +118,11 @@ app.include_router(
     prefix="/pedidos",
     tags=["pedidos"],
     dependencies=auth_dependencies,
+)
+app.include_router(
+    pedidos_sse_router,
+    prefix="/pedidos",
+    tags=["pedidos"],
 )
 app.include_router(
     bi_router,

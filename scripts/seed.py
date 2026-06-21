@@ -165,6 +165,13 @@ def criar_usuarios(db: Session, unidade: Unidade, permissoes: list[Permissao]) -
             "funcao": FuncaoUsuario.administrador,
             "permissoes": permissoes,
         },
+        {
+            "nome": "Paraiba Admin",
+            "email": "paraiba@admin.com",
+            "senha": "password",
+            "funcao": FuncaoUsuario.administrador,
+            "permissoes": permissoes,
+        },
     ]
 
     usuarios = []
