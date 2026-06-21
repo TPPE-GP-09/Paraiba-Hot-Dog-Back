@@ -26,7 +26,7 @@ from src.produtos.model import (
     Subcategoria,
     TipoVariacao,
 )
-from src.keycloak_admin import create_keycloak_user
+from src.jwt_auth import hash_password
 from src.unidades.model import Endereco, Unidade
 from src.usuarios.model import FuncaoUsuario, Usuario
 
@@ -149,7 +149,7 @@ def criar_clientes(db: Session) -> list[Cliente]:
 
 
 def criar_usuarios(db: Session, unidade: Unidade, permissoes: list[Permissao]) -> list[Usuario]:
-    """Cadastra usuarios iniciais e sincroniza com Keycloak quando habilitado."""
+    """Cadastra usuarios iniciais."""
     dados_usuarios = [
         {
             "nome": "Daniel Ferreira",
@@ -169,19 +169,12 @@ def criar_usuarios(db: Session, unidade: Unidade, permissoes: list[Permissao]) -
 
     usuarios = []
     for dados in dados_usuarios:
-        keycloak_id, _ = create_keycloak_user(
-            nome=dados["nome"],
-            email=dados["email"],
-            senha=dados["senha"],
-            nome_role=dados["funcao"].value,
-        )
         usuario = Usuario(
             nome=dados["nome"],
             email=dados["email"],
-            senha=None,
+            senha_hash=hash_password(dados["senha"]),
             funcao=dados["funcao"],
             unidade_id=unidade.id,
-            keycloak_id=keycloak_id,
         )
         usuario.permissoes = dados["permissoes"]
         db.add(usuario)

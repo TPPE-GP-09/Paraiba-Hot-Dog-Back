@@ -34,6 +34,5 @@ class UsuarioUpdate(BaseModel):
 
 class UsuarioRead(UsuarioBase):
     id: int
-    keycloak_id: str | None = None
     permissoes: list[PermissaoRead] = []
     model_config = ConfigDict(from_attributes=True)

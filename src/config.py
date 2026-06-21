@@ -15,17 +15,11 @@ class Settings(BaseSettings):
     twilio_api_key_sid: str = ""
     twilio_auth_token: str = ""
     twilio_whatsapp_from: str = "whatsapp:+14155238886"
-    keycloak_realm: str = "paraiba-hotdog"
-    keycloak_issuer: str = "http://localhost:8080/realms/paraiba-hotdog"
-    keycloak_jwks_url: str = (
-        "http://keycloak:8080/realms/paraiba-hotdog/protocol/openid-connect/certs"
-    )
-    keycloak_client_id: str | None = None
-    keycloak_jwks_cache_seconds: int = 3600
-    keycloak_admin_base_url: str = "http://localhost:8080"
-    keycloak_admin_username: str = "admin"
-    keycloak_admin_password: str = "admin"
-    keycloak_user_sync_enabled: bool = True
+    secret_key: str = "your-secret-key-change-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_hours: int = 24
+    admin_username: str = "admin"
+    admin_password: str = "admin"
     frontend_base_url: str = "http://localhost:5173"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     seed_secret_key: str = ""

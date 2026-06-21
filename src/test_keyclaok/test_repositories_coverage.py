@@ -64,9 +64,9 @@ def usuario(usuario_id=1):
     """Monta um usuario fake para os testes de repository."""
     item = Usuario(
         id=usuario_id,
-        keycloak_id="kc-1",
         nome="Usuario Teste",
         email="usuario@example.com",
+        senha_hash="$2b$12$abcdefghijklmnopqrstuvwxyz",
         funcao=FuncaoUsuario.caixa,
         unidade_id=1,
     )
@@ -141,12 +141,12 @@ def test_tratar_integridade_mapeia_erros(mensagem, status_code, detail):
     assert exc.detail == detail
 
 
-def test_create_usuario_cria_no_keycloak_e_no_banco(monkeypatch):
-    """Garante criacao de usuario local sincronizado com Keycloak."""
+def test_create_usuario_com_senha_hash(monkeypatch):
+    """Garante criacao de usuario com senha hash."""
     db = Mock()
     db.query.return_value = FakeQuery([permissao()])
     db.get.return_value = unidade()
-    monkeypatch.setattr(usuarios_repository, "create_keycloak_user", Mock(return_value=("kc-1", True)))
+    monkeypatch.setattr("src.usuarios.repository.hash_password", Mock(return_value="hashed_password"))
 
     data = UsuarioCreate(
         nome="Usuario Teste",
@@ -159,50 +159,20 @@ def test_create_usuario_cria_no_keycloak_e_no_banco(monkeypatch):
 
     criado = usuarios_repository.create_usuario(db, data)
 
-    assert criado.keycloak_id == "kc-1"
+    assert criado.senha_hash == "hashed_password"
     assert criado.permissoes[0].id == 1
     db.add.assert_called_once_with(criado)
     db.commit.assert_called_once()
     db.refresh.assert_called_once_with(criado)
 
 
-def test_create_usuario_remove_keycloak_quando_commit_falha(monkeypatch):
-    """Valida compensacao no Keycloak quando o commit local falha."""
-    db = Mock()
-    db.query.return_value = FakeQuery([])
-    db.get.return_value = None
-    db.commit.side_effect = integrity_error("duplicate email")
-    delete_mock = Mock()
-    monkeypatch.setattr(usuarios_repository, "create_keycloak_user", Mock(return_value=("kc-1", True)))
-    monkeypatch.setattr(usuarios_repository, "delete_keycloak_user", delete_mock)
-
-    data = UsuarioCreate(
-        nome="Usuario Teste",
-        email="usuario@example.com",
-        senha="12345678",
-        unidade_id=None,
-        permissao_ids=[],
-    )
-
-    with pytest.raises(HTTPException) as exc:
-        usuarios_repository.create_usuario(db, data)
-
-    assert exc.value.status_code == 409
-    db.rollback.assert_called_once()
-    delete_mock.assert_called_once_with("kc-1")
-
-
-def test_list_get_update_delete_usuario(monkeypatch):
+def test_list_get_update_delete_usuario():
     """Cobre listagem, busca, atualizacao e delecao de usuario."""
     item = usuario()
     db = Mock()
     db.query.return_value = FakeQuery([item])
     db.get.return_value = item
     db.query.return_value.all = Mock(return_value=[item])
-    update_mock = Mock()
-    delete_mock = Mock()
-    monkeypatch.setattr(usuarios_repository, "update_keycloak_user", update_mock)
-    monkeypatch.setattr(usuarios_repository, "delete_keycloak_user", delete_mock)
 
     assert usuarios_repository.list_usuarios(db, "usuario@example.com", "Usuario") == [item]
     assert usuarios_repository.get_usuario(db, 1) == item
@@ -210,36 +180,20 @@ def test_list_get_update_delete_usuario(monkeypatch):
     atualizado = usuarios_repository.update_usuario(
         db,
         1,
-        UsuarioUpdate(nome="Novo Nome", senha="nova", funcao=FuncaoUsuario.administrador),
+        UsuarioUpdate(nome="Novo Nome"),
     )
     assert atualizado.nome == "Novo Nome"
-    update_mock.assert_called_once_with(
-        "kc-1",
-        nome="Novo Nome",
-        email=None,
-        senha="nova",
-        nome_role="administrador",
-    )
 
     usuarios_repository.delete_usuario(db, 1)
     db.delete.assert_called_once_with(item)
-    delete_mock.assert_called_once_with("kc-1")
 
 
-def test_update_usuario_recria_keycloak_quando_id_antigo(monkeypatch):
-    """Recria vinculo no Keycloak quando o ID salvo nao existe mais."""
+def test_update_usuario_com_senha_hash(monkeypatch):
+    """Valida update de usuario com hash de senha."""
     item = usuario()
     db = Mock()
     db.get.return_value = item
-    update_mock = Mock(
-        side_effect=HTTPException(
-            status_code=502,
-            detail="Falha ao consultar o Keycloak: HTTP 404",
-        )
-    )
-    create_mock = Mock(return_value=("kc-novo", False))
-    monkeypatch.setattr(usuarios_repository, "update_keycloak_user", update_mock)
-    monkeypatch.setattr(usuarios_repository, "create_keycloak_user", create_mock)
+    monkeypatch.setattr("src.usuarios.repository.hash_password", Mock(return_value="new_hashed"))
 
     atualizado = usuarios_repository.update_usuario(
         db,
@@ -247,24 +201,17 @@ def test_update_usuario_recria_keycloak_quando_id_antigo(monkeypatch):
         UsuarioUpdate(email="novo@example.com", senha="nova-senha"),
     )
 
-    assert atualizado.keycloak_id == "kc-novo"
-    create_mock.assert_called_once_with(
-        nome="Usuario Teste",
-        email="novo@example.com",
-        senha="nova-senha",
-        nome_role="caixa",
-    )
+    assert atualizado.senha_hash == "new_hashed"
     db.commit.assert_called_once()
 
 
-def test_update_usuario_valida_unidade_permissoes_e_integridade(monkeypatch):
+def test_update_usuario_valida_unidade_permissoes_e_integridade():
     """Valida update de usuario com permissoes e rollback em erro."""
     item = usuario()
     db = Mock()
     db.get.return_value = item
     db.query.return_value = FakeQuery([permissao()])
     db.commit.side_effect = integrity_error("duplicate email")
-    monkeypatch.setattr(usuarios_repository, "update_keycloak_user", Mock())
 
     with pytest.raises(HTTPException) as exc:
         usuarios_repository.update_usuario(

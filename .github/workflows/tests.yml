@@ -36,9 +36,6 @@ jobs:
           docker compose logs paraiba-hotdog-back
           exit 1
 
-      - name: Generate Keycloak token
-        run: echo "API_AUTH_TOKEN=$(scripts/keycloak-token.sh)" >> "$GITHUB_ENV"
-
       - name: Run pytest
         env:
           API_BASE_URL: http://127.0.0.1:8000
